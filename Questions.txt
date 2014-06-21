@@ -1,0 +1,4 @@
+Questions
+
+1. How do I get the figures to reset without showing them?
+2. How do I move "generate_presentation.py" to root and import modules correctly?

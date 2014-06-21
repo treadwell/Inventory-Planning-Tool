@@ -1,3 +1,4 @@
+import processing as p
 import output as o
 import pandas as pd
 import numpy as np
@@ -8,9 +9,6 @@ import matplotlib.ticker as tkr
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
-
-
-# <codecell>
 
 # set path to working directory
 
@@ -44,292 +42,71 @@ inv_0 = 0  # starting inventory...not tested
 replen_lead_time = 2
 target_service_level = 0.99
 
-# program flow
-
-# <codecell>
-
-# # utility functions
-
-# def dot_sum(*args):
-#     # element wise sum of list of tuples
-#     ans = [0]*len(args[0])
-#     for arg in args:
-#         for i, point in enumerate(arg):
-#             ans[i] += point
-#     return tuple(ans)
-
-# -----------------------
-#   Expected lost sales
-# -----------------------
-
-def calc_expected_lost_sales(inventory, mean_demand, std_dev_demand):
-    shortfall = integrate.quad(lambda x: (x-inventory)*stats.norm.pdf(x, loc=mean_demand, 
-                                scale=std_dev_demand), inventory, np.inf)[0]
-    return shortfall
-
-#inventory, mean_demand, std_dev_demand = 900, 1000, 1
-#print "Shortfall:", calc_expected_lost_sales(inventory, mean_demand, std_dev_demand)
-#print "Shortfall:", calc_expected_lost_sales(900, 1000, 100)
-#print "Shortfall:", calc_expected_lost_sales(1000, 900, 100)
-# Note that this should never be negative.
 
 print  "1. Start with a forecast of demand"
 
-# Start with a forecast of demand
+month, forecast = p.calc_forecast(starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs)
 
-def calc_forecast(starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs):
-    month = [i+1 for i in xrange(number_months)]
-
-    level = [starting_monthly_demand] * number_months
-
-    trend = [int(x * (1+trendPerMonth)**i) for i, x in enumerate(level)]
-
-    forecast = [int(x*seasonCoeffs[i % 12]) for i, x in enumerate(trend)]
-
-    return month, forecast
-
-month, forecast = calc_forecast(starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs)
-
-
-def calc_sd_forecast(initial_cv, per_period_cv, forecast):
-
-    sd_forecast = [(initial_cv + i*per_period_cv) * monthly_forecast for i, monthly_forecast in enumerate(forecast)]
-
-    return sd_forecast
-
-sd_forecast = calc_sd_forecast(initial_cv, per_period_cv, forecast)
-
-def plot_forecast(month, forecast):
-    # plot forecast
-    plt.plot(month,forecast, linewidth=2.0, label='demand forecast')
-    plt.ylabel('Units')
-    plt.xlabel('Month')
-
-    plt.title('Forecasted Demand', y=1.05, weight = "bold")
-    plt.legend()
-    plt.savefig(path + 'output/' + '01_forecast.png',dpi=300)
-    plt.draw()
+sd_forecast = p.calc_sd_forecast(initial_cv, per_period_cv, forecast)
 
 o.plot_forecast(month, forecast)
 
-print "2. ...and a forecast of returns"
+print "\n2. ...and a forecast of returns"
 
-def calc_returns_forecast(number_months, forecast):
-
-    # returns forecast
-
-    returns = [0]*number_months
-
-    for i,x in enumerate(forecast):
-        if i < lag:
-            returns[i] = 0
-        else:
-            returns[i] = int(returns_rate*forecast[i-lag])
-        #print i
-        #print "forecast:", forecast[i]
-        #print "returns:", returns[i]
-
-    #print "forecast:", forecast
-    return returns
-
-returns = calc_returns_forecast(number_months, forecast)
-
-
+returns = p.calc_returns_forecast(forecast, returns_rate, lag)
 
 o.plot_returns(month, forecast, returns)
 
-print "3. use planned purchases, demand, and returns to calculate inventory position..."
+print "\n3. use planned purchases, demand, and returns to calculate inventory position..."
 
+POD_breakeven = p.calc_POD_breakeven(cost)
 
-# revised logic with ROP
-
-
-
-def calc_POD_breakeven(cost):
-    # note that this should really incorporate WACC
-    return cost['fmc']/(cost['POD_vmc']-cost['vmc'])
-
-POD_breakeven = calc_POD_breakeven(cost)
-
-def determine_plan(month, forecast, returns, cost, reorder_point = None, inv_0 = 0):
-    if reorder_point == None:
-        reorder_point = [0] * len(month)
-
-    starting_inventory = []
-    ending_inventory = []
-    average_inventory = []
-    POD_orders = [0]*len(forecast)
-    orders=[0]*len(forecast)
-
-    for i, fcst in enumerate(forecast):
-        # calculate starting inventory
-        if i == 0:
-            starting_inventory.append(inv_0)
-        else:
-            starting_inventory.append(ending_inventory[i-1])
-        # calculate trial ending inventory
-        trial_ending_inventory = starting_inventory[i] - fcst + returns[i]
-        # if trial ending inventory < ROP, place order
-        if trial_ending_inventory < reorder_point[i]:
-            # determine order quantity
-            # orders = current shortfall + order quantity
-            n=order_n_months_supply
-            terminal = min(i+n, len(reorder_point)-1)  # used to make sure index doesn't exceed length of list
-            orders[i] = sum(forecast[i:i+n])-sum(returns[i:i+n])-starting_inventory[i]+reorder_point[terminal]
-            # order POD if the size of the order is too small
-            # POD order quantity will be just what is needed in the current month
-            if orders[i] < calc_POD_breakeven(cost) and cost['allow_POD'] == True:
-                POD_orders[i] = max(forecast[i]-starting_inventory[i]-returns[i],0)
-                orders[i] = 0
-        else:
-            orders[i] = 0
-        # calculate ending inventory from inventory balance equation
-        ending_inventory.append(starting_inventory[i] - forecast[i] + returns[i]
-                                    + orders[i] + POD_orders[i])
-        #print i
-        #print "orders:", orders[i]
-        #print "POD_orders:", POD_orders[i]
-        #print "start_inv:", starting_inventory[i]
-        #print "end_inv:", ending_inventory[i]
-
-        # calculate average inventory in order to calculate period carrying cost
-        average_inventory.append((starting_inventory[i]+ending_inventory[i])/2)
-
-    return orders, POD_orders, starting_inventory, ending_inventory, average_inventory
-
-orders, POD_orders, start_inv, end_inv, avg_inv = determine_plan(month, forecast, returns, cost, [0]* number_months)
-
-
-
+orders, POD_orders, start_inv, end_inv, avg_inv = p.determine_plan(month, forecast, returns, cost, order_n_months_supply, [0]* number_months)
 
 o.plot_end_inv(month, end_inv)
 
-print "4. ...yielding a lifetime expected cost."
 
 
-# Fixed manufacturing cost - fmc
-# per order cost - perOrder
-# variable manufacturing cost - vmc
-# variable manufacturing cost of POD - POD_vmc
-# WACC for pricing inventory carrying cost - WACC
+print "\n4. ...yielding a lifetime expected cost."
 
-# print "Start Inventory", start_inv
-# print "Forecast:", forecast
-# print "Forecast SD:", sd_forecast
+FMC, VMC, POD_VMC, umc, carry_stg_cost, exp_lost_sales_cost = p.calc_costs(forecast, sd_forecast, returns, orders, POD_orders, avg_inv, start_inv, cost)
 
-def calc_costs(forecast, sd_forecast, orders, POD_orders, avg_inv, start_inv, cost):
-    FMC = [cost['fmc'] + cost['perOrder'] if round(order) else 0 for order in orders]
-    VMC = [cost['vmc'] * order for order in orders]
-    POD_VMC = [cost['POD_vmc'] * POD_order for POD_order in POD_orders]
-    umc = (sum(FMC)+sum(VMC)+sum(POD_VMC)) / (sum(orders)+sum(POD_orders)) # approximation - should be a list
-    carry_stg_cost = [float(cost['WACC']) / 12 * month_avg * umc for month_avg in avg_inv] 
-    lost_sales_expected = [cost['lost_margin']*int(calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
-                           for inv, ret, order, POD_order, dem, sd in 
-                           zip(start_inv, returns, orders, POD_orders, forecast, sd_forecast)]
+print "\tExpected cumulative lost sales (units):", sum([int(lost_dollars/cost['lost_margin']) for lost_dollars in exp_lost_sales_cost])
 
-    return FMC, VMC, POD_VMC, umc, carry_stg_cost, lost_sales_expected
-
-FMC, VMC, POD_VMC, umc, carry_stg_cost, exp_lost_sales_cost = calc_costs(forecast, sd_forecast, orders, POD_orders, avg_inv, start_inv, cost)
-
-print "Expected lost sales (units):", [int(lost_dollars/cost['lost_margin']) for lost_dollars in exp_lost_sales_cost]
-
-print "------------------------------"
-print "Total FMC:", locale.currency(sum(FMC), grouping=True )
-print "Total VMC:", locale.currency(sum(VMC), grouping=True )
-print "Total POD VMC:", locale.currency(sum(POD_VMC), grouping=True )
-print "umc:", locale.currency(umc, grouping=True )
-print "Total carrying / storage cost:", locale.currency(sum(carry_stg_cost), grouping=True )
-print "Total expected lost sales:", locale.currency(sum(exp_lost_sales_cost), grouping=True )
-
-
-# plot results
-
-
+print "\t------------------------------"
+print "\tTotal FMC:", locale.currency(sum(FMC), grouping=True )
+print "\tTotal VMC:", locale.currency(sum(VMC), grouping=True )
+print "\tTotal POD VMC:", locale.currency(sum(POD_VMC), grouping=True )
+print "\tumc:", locale.currency(umc, grouping=True )
+print "\tTotal carrying / storage cost:", locale.currency(sum(carry_stg_cost), grouping=True )
+print "\tTotal expected lost sales:", locale.currency(sum(exp_lost_sales_cost), grouping=True )
 
 
 o.plot_cost_bars(FMC, VMC, POD_VMC, carry_stg_cost)
 
-print  "5. But forecasts are wrong..."
 
+print  "\n5. But forecasts are wrong..."
 
-def calc_demand(forecast, sd_forecast):
-
-    ##############################
-    np.random.seed(5)
-    ############################## 3, 4, 
-
-    demand = [max(round(np.random.normal(fcst, sd)),0) for fcst, sd in zip(forecast, sd_forecast)]
-    lower_CI = [fcst - 1.96 * sd for fcst, sd in zip(forecast, sd_forecast)]
-    upper_CI = [fcst + 1.96 * sd for fcst, sd in zip(forecast, sd_forecast)]
-    return demand, lower_CI, upper_CI
-
-demand, lower_CI, upper_CI = calc_demand(forecast, sd_forecast)
-
+demand, lower_CI, upper_CI = p.calc_demand(forecast, sd_forecast)
 
 o.plot_demand(month, forecast, demand, lower_CI, upper_CI)
 
-print  "6. ...leading to stockouts with lost sales and expediting..."
 
+print  "\n6. ...leading to stockouts with lost sales and expediting..."
 
-def inv_from_demand(demand, orders, POD_orders, returns):
-
-    start_inv_act = []
-    start_inv_posn_act = []
-    end_inv_act = []
-    end_inv_posn_act = []
-    avg_inv_act = []
-
-    for i, order in enumerate(orders):
-        # calculate starting inventory
-        if i == 0:
-            start_inv_act.append(max(0,inv_0))  # eventually replace this with an optional input
-            start_inv_posn_act.append(0)
-        else:
-            start_inv_act.append(end_inv_act[i-1])
-            start_inv_posn_act.append(end_inv_posn_act[i-1])
-        
-        # calculate ending inventory from inventory balance equation
-        end_inv_act.append(max(0,start_inv_act[i] - demand[i] + orders[i] + 
-                               POD_orders[i] + returns[i]))
-        end_inv_posn_act.append(start_inv_posn_act[i] - demand[i] + orders[i] + 
-                                POD_orders[i] + returns[i])
-
-        # calculate average inventory in order to calculate period carrying cost
-        avg_inv_act.append((start_inv_act[i]+end_inv_act[i])/2)
-    
-    return end_inv_posn_act, avg_inv_act
-
-end_inv_posn_act, avg_inv_act = inv_from_demand(demand, orders, POD_orders, returns)
-
-#print month
-#print "forecast:", forecast
-#print "demand:", demand
-#print "returns:", returns
-#print "orders:", orders
-#print "POD_orders:", POD_orders
-#print "start_inv:", start_inv
-#print "end_inv:", end_inv
-#print "avg_inv:", avg_inv
-#print end_inv_posn_act
-
-
+end_inv_posn_act, avg_inv_act = p.inv_from_demand(demand, orders, POD_orders, returns)
 
 o.plot_end_inv_posn_act(month, end_inv_posn_act)
 
-print "7. ...and additional costs."
 
+print "\n7. ...and additional costs."
 
-print "Total actual FMC:", sum(FMC)
-print "Total actual VMC:", sum(VMC)
-print "Total actual POD VMC:", sum(POD_VMC)
-print "actual umc:", umc
-print "Total actual carrying / storage cost:", sum(carry_stg_cost)
-print "Total expected lost sales:", sum(exp_lost_sales_cost)
-
-
-# ----------------------
-
-
+print "\tTotal actual FMC:", locale.currency(sum(FMC), grouping=True )
+print "\tTotal actual VMC:", locale.currency(sum(VMC), grouping=True )
+print "\tTotal actual POD VMC:", locale.currency(sum(POD_VMC), grouping=True )
+print "\tactual umc:", locale.currency(umc, grouping=True )
+print "\tTotal actual carrying / storage cost:", locale.currency(sum(carry_stg_cost), grouping=True )
+print "\tTotal expected lost sales:", locale.currency(sum(exp_lost_sales_cost), grouping=True )
 
 o.plot_cost_bars_2(FMC, VMC, POD_VMC, carry_stg_cost, exp_lost_sales_cost)
 
@@ -345,146 +122,77 @@ o.plot_cost_bars_2(FMC, VMC, POD_VMC, carry_stg_cost, exp_lost_sales_cost)
 # Note there are many things that will keep you from actually having to incur this cost:
 
 
-print "8. The usual approach to avoid lost sales is to carry safety stock"
+print "\n8. The usual approach to avoid lost sales is to carry safety stock"
 
+reorder_point = p.calc_reorder_points(target_service_level, replen_lead_time, sd_forecast)
 
+orders_ss, POD_orders_ss, start_inv_ss, end_inv_ss, avg_inv_ss = p.determine_plan(month, forecast, returns, cost, order_n_months_supply, reorder_point)
 
-# develop plan with ROPs loaded
+FMC_ss, VMC_ss, POD_VMC_ss, umc_ss, carry_stg_cost_ss, exp_lost_sales_cost_ss = p.calc_costs(forecast, sd_forecast, returns, orders_ss, POD_orders_ss, avg_inv_ss, start_inv_ss, cost)
 
-def calc_reorder_points(target_service_level, replen_lead_time, sd_forecast):
-    # ROP = replen_lead_time * fcst + 1.96 *(replen_lead_time*sd**2)**0.5
-
-    service_multiplier = stats.norm.ppf(target_service_level, loc=0, scale=1)
-
-    #reorder_point = [int(replen_lead_time*fcst +service_multiplier*(replen_lead_time*sd**2)**0.5) 
-    #                 for fcst, sd in zip(forecast,sd_forecast)]
-
-    reorder_point = [int(service_multiplier*(replen_lead_time)**2*sd) for sd in sd_forecast]
-
-    return reorder_point
-
-reorder_point = calc_reorder_points(target_service_level, replen_lead_time, sd_forecast)
-# FMC, VMC, POD_VMC, umc, carry_stg_cost, exp_lost_sales_cost = 
-# calc_costs(forecast, sd_forecast, orders, POD_orders, avg_inv, end_inv, cost)
-orders_ss, POD_orders_ss, start_inv_ss, end_inv_ss, avg_inv_ss = determine_plan(month, forecast, returns, cost, reorder_point)
-
-FMC_ss, VMC_ss, POD_VMC_ss, umc_ss, carry_stg_cost_ss, exp_lost_sales_cost_ss = calc_costs(forecast, sd_forecast, orders_ss, POD_orders_ss, avg_inv_ss, start_inv_ss, cost)
-
-
-determine_plan
-
-print "Expected lost sales (units) no SS:", int(sum(exp_lost_sales_cost)/cost['lost_margin'])
-print "Expected lost sales (units) with SS:", int(sum(exp_lost_sales_cost_ss)/cost['lost_margin'])
-
-
-
-
-
+print "\tExpected lost sales (units) no SS:", int(sum(exp_lost_sales_cost)/cost['lost_margin'])
+print "\tExpected lost sales (units) with SS:", int(sum(exp_lost_sales_cost_ss)/cost['lost_margin'])
 
 o.plot_end_inv_2(month, end_inv, end_inv_ss)
 
-# <headingcell level=1>
 
-print "9. Another is to use POD."
-
-# <codecell>
-
+print "\n9. Another is to use POD."
 	
 #	 - it looks like lost sales, but is cheaper
 #  put the lost sales numbers into the POD vector and recalc positions and costs
 # Use the lost sales line chart with a note about the cost of a lost sale
 #  revalued_lost_sales = [0]*len(forecast)
-#lost_sales_as_POD = [-posn * cost['POD_vmc'] if posn < 0 else 0 for posn in end_inv_posn_act]
 
-#lost_sales_as_POD = [cost['POD_vmc']*calc_expected_lost_sales(inv, dem, sd) for inv, dem, sd in zip(end_inv, forecast, sd_forecast)]
-def calc_lost_sales_as_POD(cost, start_inv, returns, orders, POD_orders, forecast, sd_forecast):
-    lost_sales_as_POD = [cost['POD_vmc']*int(calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
-                               for inv, ret, order, POD_order, dem, sd in 
-                               zip(start_inv, returns, orders, POD_orders, forecast, sd_forecast)]
-    return lost_sales_as_POD
+lost_sales_as_POD = p.calc_lost_sales_as_POD(cost, start_inv, returns, orders, POD_orders, forecast, sd_forecast)
 
-lost_sales_as_POD = calc_lost_sales_as_POD(cost, start_inv, returns, orders, POD_orders, forecast, sd_forecast)
-
-print "Total actual FMC:", sum(FMC)
-print "Total actual VMC:", sum(VMC)
-print "Total actual POD VMC:", sum(POD_VMC)
-print "actual umc:", umc
-print "Total actual carrying / storage cost:", sum(carry_stg_cost)
-print "Total actual lost sales (as POD):", sum(lost_sales_as_POD)
-
-
+print "\tTotal actual FMC:", sum(FMC)
+print "\tTotal actual VMC:", sum(VMC)
+print "\tTotal actual POD VMC:", sum(POD_VMC)
+print "\tactual umc:", umc
+print "\tTotal actual carrying / storage cost:", sum(carry_stg_cost)
+print "\tTotal actual lost sales (as POD):", sum(lost_sales_as_POD)
 
 o.plot_end_inv_3(month, end_inv_posn_act)
 
-print "10. POD is best."
-
-
-# Show stacked bars of the three alternatives or three panels
-
+print "\n10. POD is best."
 
 print  "\nLost sales alternative"
 
-# <codecell>
-
-print "Total actual FMC:", locale.currency( sum(FMC), grouping=True )
-print "Total actual VMC:", locale.currency( sum(VMC), grouping=True )
-print "Total actual POD VMC:", locale.currency( sum(POD_VMC), grouping=True )
-print "actual umc:", locale.currency( umc, grouping=True )
-print "Total actual carrying / storage cost:", locale.currency( sum(carry_stg_cost), grouping=True )
-print "Total expected lost sales:", locale.currency( sum(exp_lost_sales_cost), grouping=True )
-print "Grand total with lost sales:", locale.currency( sum(FMC)+sum(VMC)+sum(POD_VMC)+sum(carry_stg_cost)+
+print "\tTotal actual FMC:", locale.currency( sum(FMC), grouping=True )
+print "\tTotal actual VMC:", locale.currency( sum(VMC), grouping=True )
+print "\tTotal actual POD VMC:", locale.currency( sum(POD_VMC), grouping=True )
+print "\tactual umc:", locale.currency( umc, grouping=True )
+print "\tTotal actual carrying / storage cost:", locale.currency( sum(carry_stg_cost), grouping=True )
+print "\tTotal expected lost sales:", locale.currency( sum(exp_lost_sales_cost), grouping=True )
+print "\tGrand total with lost sales:", locale.currency( sum(FMC)+sum(VMC)+sum(POD_VMC)+sum(carry_stg_cost)+
                                                       sum(exp_lost_sales_cost), grouping=True )
-
-# <headingcell level=2>
 
 print "\nSafety stock alternative"
 
-# <codecell>
-
-# change to capture new FMC, VMC etc w POD
-
-
-print "Total actual FMC:", locale.currency( sum(FMC_ss), grouping=True )
-print "Total actual VMC:", locale.currency( sum(VMC_ss), grouping=True )
-print "Total actual POD VMC:", locale.currency( sum(POD_VMC_ss), grouping=True )
-print "actual umc:", locale.currency( umc, grouping=True )
-print "Total actual carrying / storage cost:", locale.currency( sum(carry_stg_cost_ss), grouping=True )
-print "Total expected lost sales:", locale.currency( sum(exp_lost_sales_cost_ss), grouping=True )
-print "Grand total with safety stock:", locale.currency( sum(FMC_ss)+sum(VMC_ss)+sum(POD_VMC_ss)+sum(carry_stg_cost_ss) + sum(exp_lost_sales_cost_ss), grouping=True )
-
-# extra costs come from printing more
-
+print "\tTotal actual FMC:", locale.currency( sum(FMC_ss), grouping=True )
+print "\tTotal actual VMC:", locale.currency( sum(VMC_ss), grouping=True )
+print "\tTotal actual POD VMC:", locale.currency( sum(POD_VMC_ss), grouping=True )
+print "\tactual umc:", locale.currency( umc, grouping=True )
+print "\tTotal actual carrying / storage cost:", locale.currency( sum(carry_stg_cost_ss), grouping=True )
+print "\tTotal expected lost sales:", locale.currency( sum(exp_lost_sales_cost_ss), grouping=True )
+print "\tGrand total with safety stock:", locale.currency( sum(FMC_ss)+sum(VMC_ss)+sum(POD_VMC_ss)+sum(carry_stg_cost_ss) + sum(exp_lost_sales_cost_ss), grouping=True )
 
 
 print "\nPOD alternative"
 
 
-print "Total actual FMC:", locale.currency( sum(FMC), grouping=True )
-print "Total actual VMC:", locale.currency( sum(VMC), grouping=True )
-print "Total actual POD VMC:", locale.currency( sum(POD_VMC), grouping=True )
-print "actual umc:", locale.currency( umc, grouping=True )
-print "Total actual carrying / storage cost:", locale.currency( sum(carry_stg_cost), grouping=True )
-print "Total actual lost sales (as POD):", locale.currency( sum(lost_sales_as_POD), grouping=True )
-print "Grand total with lost sales (as POD):", locale.currency( sum(FMC)+sum(VMC)+sum(POD_VMC)+sum(carry_stg_cost)+sum(lost_sales_as_POD), grouping=True )
-
-# <codecell>
-
-#  Need a stacked bar here
-#cost_plot = ggplot(aes(x='Cost Components'), data = plot_df) + \
-#    geom_bar(weight = costs) + \
-#    ggtitle("10. POD offers the best cost profile.")  + \
-#    ylab("Lifetime Cost (dollars)") + \
-#    scale_y_continuous(labels='comma')
-    
-#ggsave(cost_plot, "10_cost_comparison.png")
-
+print "\tTotal actual FMC:", locale.currency( sum(FMC), grouping=True )
+print "\tTotal actual VMC:", locale.currency( sum(VMC), grouping=True )
+print "\tTotal actual POD VMC:", locale.currency( sum(POD_VMC), grouping=True )
+print "\tactual umc:", locale.currency( umc, grouping=True )
+print "\tTotal actual carrying / storage cost:", locale.currency( sum(carry_stg_cost), grouping=True )
+print "\tTotal actual lost sales (as POD):", locale.currency( sum(lost_sales_as_POD), grouping=True )
+print "\tGrand total with lost sales (as POD):", locale.currency( sum(FMC)+sum(VMC)+sum(POD_VMC)+sum(carry_stg_cost)+sum(lost_sales_as_POD), grouping=True )
 
 
 o.plot_cost_bars_final(FMC, FMC_ss, VMC, VMC_ss, POD_VMC, POD_VMC_ss, carry_stg_cost, carry_stg_cost_ss, exp_lost_sales_cost, exp_lost_sales_cost_ss, lost_sales_as_POD)
 
-
-# <codecell>
-
+print "\ntest section with data frames\n"
 test_columns = ["FMC", "VMC", "VMC POD", "Carry/Stg", "Lost Sales", "LS as POD"]
 test_rows = ["Planned", "Act w Lost Sales", "Act w SS", "Act w POD"]
 
@@ -529,19 +237,10 @@ plt.title('Expected Lifetime Cost', y=1.05, weight = "bold")
 #fig = matplotlib.pyplot.gcf()
 #fig.savefig('graph.png')
 
-# <headingcell level=1>
+print "\n11. What does a POD lifecycle look like?"
 
-print "11. What does a POD lifecycle look like?"
-
-# <codecell>
-
-# Inventory position
-
-# <codecell>
 
 # Lifetime cost versus base
-
-# <markdowncell>
 
 # *	low volume titles
 # *	samples
@@ -551,7 +250,7 @@ print "11. What does a POD lifecycle look like?"
 
 # <headingcell level=1>
 
-print "12. What does a title with dramatic seasonality look like?"
+print "\n12. What does a title with dramatic seasonality look like?"
 
 # <codecell>
 
@@ -563,7 +262,7 @@ print "12. What does a title with dramatic seasonality look like?"
 
 # <headingcell level=1>
 
-print "13. What happens with systematic over-forecasting?"
+print "\n13. What happens with systematic over-forecasting?"
 
 # <codecell>
 
@@ -575,7 +274,7 @@ print "13. What happens with systematic over-forecasting?"
 
 # <headingcell level=1>
 
-print "14. What if we're really terrible at forecasting?"
+print "\n14. What if we're really terrible at forecasting?"
 
 # <codecell>
 
@@ -587,7 +286,7 @@ print "14. What if we're really terrible at forecasting?"
 
 # <headingcell level=1>
 
-print "15. What if we use Economic Order Quantity (EOQ) or other techniques?"
+print "\n15. What if we use Economic Order Quantity (EOQ) or other techniques?"
 
 # <codecell>
 
@@ -595,7 +294,7 @@ print "15. What if we use Economic Order Quantity (EOQ) or other techniques?"
 
 # <headingcell level=1>
 
-print "16. What if we dramatically reduce our print lead times?"
+print "\n16. What if we dramatically reduce our print lead times?"
 
 # <codecell>
 
@@ -607,7 +306,7 @@ print "16. What if we dramatically reduce our print lead times?"
 
 # <headingcell level=1>
 
-print "15. To do this you need infrastructure:"
+print "\n15. To do this you need infrastructure:"
 
 # *  file mgmt
 # *  printers (conventional and POD)

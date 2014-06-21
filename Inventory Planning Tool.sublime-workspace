@@ -4,6 +4,14 @@
 		"selected_items":
 		[
 			[
+				"return",
+				"returns_rate"
+			],
+			[
+				"retu",
+				"returns_rate"
+			],
+			[
 				"POD",
 				"POD_orders"
 			],
@@ -236,34 +244,35 @@
 	"buffers":
 	[
 		{
-			"file": "generate_presentation.py",
-			"settings":
-			{
-				"buffer_size": 30302,
-				"line_ending": "Unix"
-			}
-		},
-		{
 			"file": "scripts/processing.py",
 			"settings":
 			{
-				"buffer_size": 30585,
+				"buffer_size": 8430,
 				"line_ending": "Unix"
 			}
 		},
 		{
-			"file": "scripts/__init__.py",
+			"file": "scripts/generate_presentation.py",
 			"settings":
 			{
-				"buffer_size": 0,
+				"buffer_size": 12368,
 				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "Questions.txt",
+			"settings":
+			{
+				"buffer_size": 151,
+				"line_ending": "Unix",
+				"name": "Questions"
 			}
 		},
 		{
 			"file": "scripts/output.py",
 			"settings":
 			{
-				"buffer_size": 330,
+				"buffer_size": 9879,
 				"line_ending": "Unix"
 			}
 		}
@@ -299,6 +308,11 @@
 	},
 	"file_history":
 	[
+		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/generate_presentation.py",
+		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/__init__.py",
+		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/scripts/processing.py",
+		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/scripts/output.py",
+		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/scripts/__init__.py",
 		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/scripts/Inventory Planning Graphs.ipynb",
 		"/Users/kbrooks/Documents/MH/Projects/Metrics/Distribution/Scheduled Unscheduled (CDC0089-1)/data/2014-03-22 CDC0089.txt",
 		"/Users/kbrooks/Documents/MH/Projects/Metrics/Distribution/Scheduled Unscheduled (CDC0089-1)/scripts/execution_wipe_tables.py",
@@ -377,6 +391,9 @@
 		"case_sensitive": true,
 		"find_history":
 		[
+			" \"",
+			"calc_expected_lost_sales",
+			"calc_costs",
 			"expected lost sale",
 			"expected lost sales (units)",
 			"raise",
@@ -415,11 +432,12 @@
 			"notebook_di"
 		],
 		"highlight": true,
-		"in_selection": false,
+		"in_selection": true,
 		"preserve_case": false,
 		"regex": false,
 		"replace_history":
 		[
+			" \"\\t",
 			"# plt.show",
 			"# plt.show(1)",
 			"orders",
@@ -475,19 +493,19 @@
 			[
 				{
 					"buffer": 0,
-					"file": "generate_presentation.py",
+					"file": "scripts/processing.py",
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 30302,
+						"buffer_size": 8430,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								2816,
-								2816
+								8430,
+								8430
 							]
 						],
 						"settings":
@@ -497,7 +515,7 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 0.0,
+						"translation.y": 2488.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 1,
@@ -505,19 +523,19 @@
 				},
 				{
 					"buffer": 1,
-					"file": "scripts/processing.py",
+					"file": "scripts/generate_presentation.py",
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 30585,
+						"buffer_size": 12368,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								0,
-								0
+								11194,
+								11194
 							]
 						],
 						"settings":
@@ -527,7 +545,7 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 0.0,
+						"translation.y": 46.0,
 						"zoom_level": 1.0
 					},
 					"stack_index": 0,
@@ -535,30 +553,31 @@
 				},
 				{
 					"buffer": 2,
-					"file": "scripts/__init__.py",
+					"file": "Questions.txt",
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 0,
+						"buffer_size": 151,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								0,
-								0
+								151,
+								151
 							]
 						],
 						"settings":
 						{
-							"syntax": "Packages/Python/Python.tmLanguage"
+							"auto_name": "Questions",
+							"syntax": "Packages/Text/Plain text.tmLanguage"
 						},
 						"translation.x": 0.0,
 						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 2,
+					"stack_index": 3,
 					"type": "text"
 				},
 				{
@@ -567,26 +586,28 @@
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 330,
+						"buffer_size": 9879,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								3,
-								3
+								6348,
+								6348
 							]
 						],
 						"settings":
 						{
-							"syntax": "Packages/Python/Python.tmLanguage"
+							"syntax": "Packages/Python/Python.tmLanguage",
+							"tab_size": 4,
+							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 0.0,
+						"translation.y": 1922.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 3,
+					"stack_index": 2,
 					"type": "text"
 				}
 			]
