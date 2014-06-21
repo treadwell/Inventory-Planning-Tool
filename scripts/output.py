@@ -22,7 +22,7 @@ def plot_forecast(month, forecast):
 
     plt.title('Forecasted Demand', y=1.05, weight = "bold")
     plt.legend()
-    plt.savefig('../output/' + '01_forecast.png',dpi=300)
+    plt.savefig('./output/' + '01_forecast.png',dpi=300)
     plt.figure(1)
 
 def plot_returns(month, forecast, returns):
@@ -33,19 +33,19 @@ def plot_returns(month, forecast, returns):
 
     plt.title('Forecasted Demand and Returns', y=1.05, weight = "bold")
     plt.legend()
-    plt.savefig('../output/' + '02_returns.png', dpi=300)
+    plt.savefig('./output/' + '02_returns.png', dpi=300)
     plt.figure(2)
 
-def plot_end_inv(month, end_inv):
+def plot_end_inv(month, end_inv, title, filename):
     plt.plot(month,end_inv, linewidth=2.0, color = "g",label='ending inventory')
     d = np.array([0]*len(month))
     plt.fill_between(month, d, end_inv, where=end_inv>=d, interpolate=True, facecolor='green')
     plt.ylabel('Units')
     plt.xlabel('Month')
 
-    plt.title('Planned Ending Inventory Position', y=1.05, weight = "bold")
+    plt.title(title, y=1.05, weight = "bold")
     plt.legend()
-    plt.savefig('../output/' + '03_inventory.png', dpi=300)
+    plt.savefig('./output/' + filename, dpi=300)
 
     plt.figure(3)
 
@@ -85,7 +85,7 @@ def plot_cost_bars(FMC, VMC, POD_VMC, carry_stg_cost):
                ncol=1, fancybox=True, shadow=True)
     plt.grid()
 
-    plt.savefig('../output/' + '04_plan_cost.png', dpi=300, 
+    plt.savefig('./output/' + '04_plan_cost.png', dpi=300, 
             bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.figure(4)
 
@@ -99,7 +99,7 @@ def plot_demand(month, forecast, demand, lower_CI, upper_CI):
     plt.title('Demand: Actual vs. Forecast', y=1.05, weight = "bold")
     plt.legend()
 
-    plt.savefig('../output/' + '05_forecast_error.png', dpi=300)
+    plt.savefig('./output/' + '05_forecast_error.png', dpi=300)
 
     plt.figure(5)
 
@@ -118,7 +118,7 @@ def plot_end_inv_posn_act(month, end_inv_posn_act):
     plt.title('Actual Ending Inventory Position', y=1.05, weight = "bold")
     plt.legend()
 
-    plt.savefig('../output/' + '06_inventory_posn.png', dpi=300)
+    plt.savefig('./output/' + '06_inventory_posn.png', dpi=300)
     plt.figure(6)
 
 def plot_cost_bars_2(FMC, VMC, POD_VMC, carry_stg_cost, exp_lost_sales_cost):
@@ -158,7 +158,7 @@ def plot_cost_bars_2(FMC, VMC, POD_VMC, carry_stg_cost, exp_lost_sales_cost):
                 'POD Safety'), loc='upper center', bbox_to_anchor=(0.95, 1.05), ncol=1, fancybox=True, shadow=True)
     plt.grid()
 
-    plt.savefig('../output/' + '07_lost_sale_cost.png', dpi=300, 
+    plt.savefig('./output/' + '07_lost_sale_cost.png', dpi=300, 
             bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.figure(7)
 
@@ -178,7 +178,7 @@ def plot_end_inv_2(month, end_inv, end_inv_ss):
     plt.title('Expected Ending Inventory Position', y=1.05, weight = "bold")
     plt.legend()
 
-    plt.savefig('../output/' + '08_safety_stock.png', dpi=300)
+    plt.savefig('./output/' + '08_safety_stock.png', dpi=300)
     plt.figure(8)
 
 def plot_end_inv_3(month, end_inv_posn_act):
@@ -195,7 +195,7 @@ def plot_end_inv_3(month, end_inv_posn_act):
     plt.title('Actual Ending Inventory Position', y=1.05, weight = "bold")
     plt.legend()
 
-    plt.savefig('../output/' + '09_POD_posn.png', dpi=300)
+    plt.savefig('./output/' + '09_POD_posn.png', dpi=300)
     plt.figure(9)
 
 def plot_cost_bars_final(FMC, FMC_ss, VMC, VMC_ss, POD_VMC, POD_VMC_ss, carry_stg_cost, carry_stg_cost_ss, exp_lost_sales_cost, exp_lost_sales_cost_ss, lost_sales_as_POD):
@@ -238,6 +238,6 @@ def plot_cost_bars_final(FMC, FMC_ss, VMC, VMC_ss, POD_VMC, POD_VMC_ss, carry_st
                ncol=1, fancybox=True, shadow=True)
     plt.grid()
 
-    plt.savefig('../output/' + '10_final_cost_comparison.png', dpi=300, bbox_extra_artists=(lgd,), bbox_inches='tight')
+    plt.savefig('./output/' + '10_final_cost_comparison.png', dpi=300, bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.figure(10)
 

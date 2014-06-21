@@ -252,10 +252,26 @@
 			}
 		},
 		{
-			"file": "scripts/generate_presentation.py",
+			"file": "Inventory Planning Tool.sublime-project",
 			"settings":
 			{
-				"buffer_size": 12368,
+				"buffer_size": 73,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "test.py",
+			"settings":
+			{
+				"buffer_size": 83,
+				"line_ending": "Unix"
+			}
+		},
+		{
+			"file": "generate_presentation.py",
+			"settings":
+			{
+				"buffer_size": 12550,
 				"line_ending": "Unix"
 			}
 		},
@@ -269,10 +285,13 @@
 			}
 		},
 		{
+			"contents": "import matplotlib.pyplot as plt\nimport matplotlib.ticker as tkr\nimport numpy as np\n\n\n# utility functions\n\ndef dot_sum(*args):\n    # element wise sum of list of tuples\n    ans = [0]*len(args[0])\n    for arg in args:\n        for i, point in enumerate(arg):\n            ans[i] += point\n    return tuple(ans)\n\n\ndef plot_forecast(month, forecast):\n    # plot forecast\n    plt.plot(month,forecast, linewidth=2.0, label='demand forecast')\n    plt.ylabel('Units')\n    plt.xlabel('Month')\n\n    plt.title('Forecasted Demand', y=1.05, weight = \"bold\")\n    plt.legend()\n    plt.savefig('./output/' + '01_forecast.png',dpi=300)\n    plt.figure(1)\n\ndef plot_returns(month, forecast, returns):\n    plt.plot(month,forecast, linewidth=2.0, label='demand forecast')\n    plt.plot(month,returns, linewidth=2.0, label='returns forecast')\n    plt.ylabel('Units')\n    plt.xlabel('Month')\n\n    plt.title('Forecasted Demand and Returns', y=1.05, weight = \"bold\")\n    plt.legend()\n    plt.savefig('./output/' + '02_returns.png', dpi=300)\n    plt.figure(2)\n\ndef plot_end_inv(month, end_inv, title, filename):\n    plt.plot(month,end_inv, linewidth=2.0, color = \"g\",label='ending inventory')\n    d = np.array([0]*len(month))\n    plt.fill_between(month, d, end_inv, where=end_inv>=d, interpolate=True, facecolor='green')\n    plt.ylabel('Units')\n    plt.xlabel('Month')\n\n    plt.title(title, y=1.05, weight = \"bold\")\n    plt.legend()\n    plt.savefig('./output/' + filename, dpi=300)\n\n    plt.figure(3)\n\ndef plot_cost_bars(FMC, VMC, POD_VMC, carry_stg_cost):\n\n    N = 4\n    FMC_plot   = (sum(FMC), 0, 0, 0)\n    VMC_plot = (sum(VMC), 0, 0, 0)\n    PODVMC_plot     = (sum(POD_VMC), 0, 0, 0)\n    carry_storage_plot   = (sum(carry_stg_cost), 0, 0, 0)\n    lost_sales_plot = (0, 0, 0, 0)\n               \n    POD_plot = (0,0,0,0)\n               \n    ind = np.arange(N)    # the x locations for the groups\n    width = 0.45       # the width of the bars: can also be len(x) sequence\n\n\n\n    p1 = plt.barh(ind, FMC_plot, width, color='b')\n    p2 = plt.barh(ind, VMC_plot, width, color='g', left=FMC_plot)\n    p3 = plt.barh(ind, PODVMC_plot, width, color = 'r', left = dot_sum(VMC_plot, FMC_plot))\n    p4 = plt.barh(ind, carry_storage_plot, width, color='c', left =\n                 dot_sum(VMC_plot, FMC_plot, PODVMC_plot))\n    p5 = plt.barh(ind, lost_sales_plot, width, color='m',\n                 left = dot_sum(VMC_plot, FMC_plot, PODVMC_plot, carry_storage_plot))\n    p6 = plt.barh(ind, POD_plot, width, color='y',\n                 left = dot_sum(VMC_plot, FMC_plot, PODVMC_plot, carry_storage_plot, lost_sales_plot))\n\n    plt.xlabel('Cost ($)')\n    plt.title('Expected Lifetime Cost', y=1.05, weight = \"bold\")\n    plt.yticks(ind+width/2., ('Plan', '', '', '') )\n\n    lgd = plt.legend( (p1[0], p2[0],p3[0],p4[0], p5[0], p6[0]), \n               ('Fixed Mfg', 'Variable Mfg', 'POD Variable', 'Carry/Storage', 'Lost Sales', \n                'POD Safety'), loc='upper center', bbox_to_anchor=(0.95, 1.05), \n               ncol=1, fancybox=True, shadow=True)\n    plt.grid()\n\n    plt.savefig('./output/' + '04_plan_cost.png', dpi=300, \n            bbox_extra_artists=(lgd,), bbox_inches='tight')\n    plt.figure(4)\n\ndef plot_demand(month, forecast, demand, lower_CI, upper_CI):\n    plt.plot(month,forecast, linewidth=2.0, label='demand forecast')\n    plt.plot(month,demand, linewidth=2.0, label='actual demand')\n    plt.plot(month,upper_CI, linewidth=0.5, label='95% Conf Interval', color=\"blue\")\n    plt.plot(month,lower_CI, linewidth=0.5, color=\"blue\")\n    plt.ylabel('Units')\n    plt.xlabel('Month')\n    plt.title('Demand: Actual vs. Forecast', y=1.05, weight = \"bold\")\n    plt.legend()\n\n    plt.savefig('./output/' + '05_forecast_error.png', dpi=300)\n\n    plt.figure(5)\n\ndef plot_end_inv_posn_act(month, end_inv_posn_act):\n    #print inventory_plot\n\n    ''' combine this into the previous inventory position plot function'''\n\n    plt.plot(month,end_inv_posn_act, linewidth=2.0, \n             label='end inventory position', color='green')\n    d = np.array([0]*len(month))\n    plt.fill_between(month, d, end_inv_posn_act, where=end_inv_posn_act<=d, interpolate=True, facecolor='red')\n    plt.fill_between(month, d, end_inv_posn_act, where=end_inv_posn_act>=d, interpolate=True, facecolor='green')\n    plt.ylabel('Units')\n    plt.xlabel('Month')\n    plt.title('Actual Ending Inventory Position', y=1.05, weight = \"bold\")\n    plt.legend()\n\n    plt.savefig('./output/' + '06_inventory_posn.png', dpi=300)\n    plt.figure(6)\n\ndef plot_cost_bars_2(FMC, VMC, POD_VMC, carry_stg_cost, exp_lost_sales_cost):\n\n    ''' Combine this into the previous plot_cost_bars function'''\n    N = 4\n    FMC_plot   = (sum(FMC), sum(FMC), 0,0)\n    VMC_plot = (sum(VMC), sum(VMC), 0, 0)\n    PODVMC_plot     = (sum(POD_VMC), sum(POD_VMC), 0, 0)\n    carry_storage_plot   = (sum(carry_stg_cost), sum(carry_stg_cost), 0, 0)\n    lost_sales_plot = (0, sum(exp_lost_sales_cost), 0, 0)\n               \n    POD_plot = (0,0,0, 0)\n               \n    ind = np.arange(N)    # the x locations for the groups\n    width = 0.45       # the width of the bars: can also be len(x) sequence\n\n\n\n    p1 = plt.barh(ind, FMC_plot, width, color='b')\n    p2 = plt.barh(ind, VMC_plot, width, color='g', left=FMC_plot)\n    p3 = plt.barh(ind, PODVMC_plot, width, color = 'r', left = dot_sum(VMC_plot, FMC_plot))\n    p4 = plt.barh(ind, carry_storage_plot, width, color='c', left =\n                 dot_sum(VMC_plot, FMC_plot, PODVMC_plot))\n    p5 = plt.barh(ind, lost_sales_plot, width, color='m',\n                 left = dot_sum(VMC_plot, FMC_plot, PODVMC_plot, carry_storage_plot))\n    p6 = plt.barh(ind, POD_plot, width, color='y',\n                 left = dot_sum(VMC_plot, FMC_plot, PODVMC_plot, carry_storage_plot, lost_sales_plot))\n\n    plt.xlabel('Cost ($)')\n\n    plt.title('Expected Lifetime Cost', y=1.05, weight = \"bold\")\n    plt.yticks(ind+width/2., ('Plan', 'Act w\\nLost Sales', '', '') )\n\n    lgd = plt.legend( (p1[0], p2[0],p3[0],p4[0], p5[0], p6[0]), \n               ('Fixed Mfg', 'Variable Mfg', 'POD Variable', 'Carry/Storage', 'Lost Sales', \n                'POD Safety'), loc='upper center', bbox_to_anchor=(0.95, 1.05), ncol=1, fancybox=True, shadow=True)\n    plt.grid()\n\n    plt.savefig('./output/' + '07_lost_sale_cost.png', dpi=300, \n            bbox_extra_artists=(lgd,), bbox_inches='tight')\n    plt.figure(7)\n\n\ndef plot_end_inv_3(month, end_inv_posn_act):\n\n    # this should be the same as the lost sale area chart\n\n    plt.plot(month,end_inv_posn_act, linewidth=2.0, \n             label='end inventory position', color='green')\n    d = np.array([0]*len(month))\n    plt.fill_between(month, d, end_inv_posn_act, where=end_inv_posn_act<=d, interpolate=True, facecolor='blue')\n    plt.fill_between(month, d, end_inv_posn_act, where=end_inv_posn_act>=d, interpolate=True, facecolor='green')\n    plt.ylabel('Units')\n    plt.xlabel('Month')\n    plt.title('Actual Ending Inventory Position', y=1.05, weight = \"bold\")\n    plt.legend()\n\n    plt.savefig('./output/' + '09_POD_posn.png', dpi=300)\n    plt.figure(9)\n\ndef plot_cost_bars_final(FMC, FMC_ss, VMC, VMC_ss, POD_VMC, POD_VMC_ss, carry_stg_cost, carry_stg_cost_ss, exp_lost_sales_cost, exp_lost_sales_cost_ss, lost_sales_as_POD):\n    '''Combine with other bar charts'''\n\n\n    N = 4\n    FMC_plot   = (sum(FMC), sum(FMC), sum(FMC_ss), sum(FMC))\n    VMC_plot = (sum(VMC), sum(VMC), sum(VMC_ss), sum(VMC))\n    PODVMC_plot     = (sum(POD_VMC), sum(POD_VMC), sum(POD_VMC_ss), sum(POD_VMC))\n    carry_storage_plot   = (sum(carry_stg_cost), sum(carry_stg_cost), \n                            sum(carry_stg_cost_ss), sum(carry_stg_cost))\n    lost_sales_plot = (0, sum(exp_lost_sales_cost), sum(exp_lost_sales_cost_ss), 0)\n               \n    POD_plot = (0,0,0, sum(lost_sales_as_POD))\n               \n    ind = np.arange(N)    # the x locations for the groups\n    width = 0.45       # the width of the bars: can also be len(x) sequence\n\n\n\n    p1 = plt.barh(ind, FMC_plot, width, color='b')\n    p2 = plt.barh(ind, VMC_plot, width, color='g', left=FMC_plot)\n    p3 = plt.barh(ind, PODVMC_plot, width, color = 'r', left = dot_sum(VMC_plot, FMC_plot))\n    p4 = plt.barh(ind, carry_storage_plot, width, color='c', left =\n                 dot_sum(VMC_plot, FMC_plot, PODVMC_plot))\n    p5 = plt.barh(ind, lost_sales_plot, width, color='m',\n                 left = dot_sum(VMC_plot, FMC_plot, PODVMC_plot, carry_storage_plot))\n    p6 = plt.barh(ind, POD_plot, width, color='y',\n                 left = dot_sum(VMC_plot, FMC_plot, PODVMC_plot, carry_storage_plot, lost_sales_plot))\n\n    plt.xlabel('Cost ($)')\n\n    plt.title('Expected Lifetime Cost', y=1.05, weight = \"bold\")\n    plt.yticks(ind+width/2., ('Plan', 'Act w\\nLost Sales', 'Act w SS', 'Act w POD') )\n\n    lgd = plt.legend( (p1[0], p2[0],p3[0],p4[0], p5[0], p6[0]), \n               ('Fixed Mfg', 'Variable Mfg', 'POD Variable', 'Carry/Storage', 'Lost Sales', \n                'POD Safety'), loc='upper center', bbox_to_anchor=(1.1, 1.05), \n               ncol=1, fancybox=True, shadow=True)\n    plt.grid()\n\n    plt.savefig('./output/' + '10_final_cost_comparison.png', dpi=300, bbox_extra_artists=(lgd,), bbox_inches='tight')\n    plt.figure(10)\n\n",
 			"file": "scripts/output.py",
+			"file_size": 9866,
+			"file_write_time": 130478539360000000,
 			"settings":
 			{
-				"buffer_size": 9879,
+				"buffer_size": 9160,
 				"line_ending": "Unix"
 			}
 		}
@@ -308,6 +327,7 @@
 	},
 	"file_history":
 	[
+		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/scripts/generate_presentation.py",
 		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/generate_presentation.py",
 		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/__init__.py",
 		"/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/scripts/processing.py",
@@ -391,6 +411,7 @@
 		"case_sensitive": true,
 		"find_history":
 		[
+			"../output/",
 			" \"",
 			"calc_expected_lost_sales",
 			"calc_costs",
@@ -432,11 +453,12 @@
 			"notebook_di"
 		],
 		"highlight": true,
-		"in_selection": true,
+		"in_selection": false,
 		"preserve_case": false,
 		"regex": false,
 		"replace_history":
 		[
+			"./output/",
 			" \"\\t",
 			"# plt.show",
 			"# plt.show(1)",
@@ -488,7 +510,7 @@
 	"groups":
 	[
 		{
-			"selected": 1,
+			"selected": 5,
 			"sheets":
 			[
 				{
@@ -515,44 +537,98 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 2488.0,
+						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 1,
+					"stack_index": 3,
 					"type": "text"
 				},
 				{
 					"buffer": 1,
-					"file": "scripts/generate_presentation.py",
-					"semi_transient": false,
+					"file": "Inventory Planning Tool.sublime-project",
+					"semi_transient": true,
 					"settings":
 					{
-						"buffer_size": 12368,
+						"buffer_size": 73,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								11194,
-								11194
+								0,
+								0
 							]
 						],
 						"settings":
 						{
-							"syntax": "Packages/Python/Python.tmLanguage",
-							"tab_size": 4,
-							"translate_tabs_to_spaces": true
+							"syntax": "Packages/JavaScript/JSON.tmLanguage"
 						},
 						"translation.x": 0.0,
-						"translation.y": 46.0,
+						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 0,
+					"stack_index": 2,
 					"type": "text"
 				},
 				{
 					"buffer": 2,
+					"file": "test.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 83,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								77,
+								77
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 0.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 4,
+					"type": "text"
+				},
+				{
+					"buffer": 3,
+					"file": "generate_presentation.py",
+					"semi_transient": false,
+					"settings":
+					{
+						"buffer_size": 12550,
+						"regions":
+						{
+						},
+						"selection":
+						[
+							[
+								5039,
+								5039
+							]
+						],
+						"settings":
+						{
+							"syntax": "Packages/Python/Python.tmLanguage"
+						},
+						"translation.x": 0.0,
+						"translation.y": 1535.0,
+						"zoom_level": 1.0
+					},
+					"stack_index": 1,
+					"type": "text"
+				},
+				{
+					"buffer": 4,
 					"file": "Questions.txt",
 					"semi_transient": false,
 					"settings":
@@ -577,24 +653,24 @@
 						"translation.y": 0.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 3,
+					"stack_index": 5,
 					"type": "text"
 				},
 				{
-					"buffer": 3,
+					"buffer": 5,
 					"file": "scripts/output.py",
 					"semi_transient": false,
 					"settings":
 					{
-						"buffer_size": 9879,
+						"buffer_size": 9160,
 						"regions":
 						{
 						},
 						"selection":
 						[
 							[
-								6348,
-								6348
+								6334,
+								6334
 							]
 						],
 						"settings":
@@ -604,10 +680,10 @@
 							"translate_tabs_to_spaces": true
 						},
 						"translation.x": 0.0,
-						"translation.y": 1922.0,
+						"translation.y": 1597.0,
 						"zoom_level": 1.0
 					},
-					"stack_index": 2,
+					"stack_index": 0,
 					"type": "text"
 				}
 			]

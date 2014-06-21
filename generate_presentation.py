@@ -1,5 +1,5 @@
-import processing as p
-import output as o
+import scripts.processing as p
+import scripts.output as o
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -63,7 +63,7 @@ POD_breakeven = p.calc_POD_breakeven(cost)
 
 orders, POD_orders, start_inv, end_inv, avg_inv = p.determine_plan(month, forecast, returns, cost, order_n_months_supply, [0]* number_months)
 
-o.plot_end_inv(month, end_inv)
+o.plot_end_inv(month, end_inv,'Actual Ending Inventory Position', '03_inventory.png')
 
 
 
@@ -133,7 +133,8 @@ FMC_ss, VMC_ss, POD_VMC_ss, umc_ss, carry_stg_cost_ss, exp_lost_sales_cost_ss = 
 print "\tExpected lost sales (units) no SS:", int(sum(exp_lost_sales_cost)/cost['lost_margin'])
 print "\tExpected lost sales (units) with SS:", int(sum(exp_lost_sales_cost_ss)/cost['lost_margin'])
 
-o.plot_end_inv_2(month, end_inv, end_inv_ss)
+#o.plot_end_inv_2(month, end_inv, end_inv_ss)
+o.plot_end_inv(month, end_inv_ss, 'Expected Ending Inventory Position (Safety Stock)', '08_safety_stock.png')
 
 
 print "\n9. Another is to use POD."
