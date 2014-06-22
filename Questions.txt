@@ -1,4 +1,10 @@
 Questions
 
 1. How do I get the figures to reset without showing them?
+	> Use figure()
 2. How do I move "generate_presentation.py" to root and import modules correctly?
+	> Hacked it
+3. What should the class structure look like?
+4. Any good way to consolidate functions?
+5. Should the plotting be separate from the other class methods, or just pile them all in together?
+6. Data structures for plan alternatives?  Should they be classes on their own?

@@ -162,24 +162,6 @@ def plot_cost_bars_2(FMC, VMC, POD_VMC, carry_stg_cost, exp_lost_sales_cost):
             bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.figure(7)
 
-def plot_end_inv_2(month, end_inv, end_inv_ss):
-
-    '''Combine this with other end_inv plot functions'''
-
-    plt.plot(month,end_inv, linewidth=2.0, label='end inventory position', 
-             color ='green')
-    d = np.array([0]*len(month))
-    plt.fill_between(month, d, end_inv_ss, where=end_inv<=d, 
-                     interpolate=True, facecolor='red')
-    plt.fill_between(month, d, end_inv_ss, where=end_inv>=d, 
-                     interpolate=True, facecolor='green')
-    plt.ylabel('Units')
-    plt.xlabel('Month')
-    plt.title('Expected Ending Inventory Position', y=1.05, weight = "bold")
-    plt.legend()
-
-    plt.savefig('./output/' + '08_safety_stock.png', dpi=300)
-    plt.figure(8)
 
 def plot_end_inv_3(month, end_inv_posn_act):
 

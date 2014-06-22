@@ -322,9 +322,6 @@ print "\n15. To do this you need infrastructure:"
 
 # * Fixes
 #     * fix currency formatting on graphs
-#     * fix stacked bar charts
-#         *  turn them horizontal
-#         *  make sure they actually work
 # * Rationalize variables and functions
 #     * plan vs actual
 #     * lost sales vs. safety stock vs. POD
