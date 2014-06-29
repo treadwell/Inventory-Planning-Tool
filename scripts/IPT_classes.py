@@ -9,6 +9,15 @@ import locale
 locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
 
 
+def scenario(title, demand_p, print_p, returns_p, ss_p, purchasing_p):
+    # title should be an actual object
+    # the other inputs should be classes
+    d = demand_p(title)
+    
+
+
+
+
 class Title(object):
     def __init__(self, title_name, cost):
         self.title_name = title_name
@@ -20,37 +29,31 @@ class Title(object):
         print "cost: ", self.cost
 
 
+
+
 class Demand_Plan(object):
-    def __init__(self, title, title_demand_plan, title_returns_plan):
-        self.title = title
-        self.title_demand_plan = title_demand_plan
-        self.title_returns_plan = title_returns_plan
-        forecast = self.title_demand_plan.calc_forecast()
-        sd_forecast = self.title_demand_plan.calc_sd_forecast()
-        returns_forecast = self.title_returns_plan.calc_returns_forecast()
-
-    def output(self):
-        ''' Print variables and values'''  # there has to be a better way to do this!
-        print "title_name :", self.title_name
-        print "cost: ", self.cost
-        print "forecast", self.forecast
-
-
-class Title_Demand_Plan(Demand_Plan):
+    # should not be called, just an archetype for later plans
     def __init__(self, title, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv):
-        self.title = title
+        self.title_name = title.title_name
         self.starting_monthly_demand = starting_monthly_demand
         self.number_months = number_months
         self.trendPerMonth = trendPerMonth
         self.seasonCoeffs = seasonCoeffs
         self.initial_cv = initial_cv
         self.per_period_cv = per_period_cv
+        self.forecast = self.calc_forecast()
+        ### if this is the only time calc_forecast is called, you should
+        ### explicitly pass its inputs in (instead of going through self)
         
     def output(self):
+        return
         ''' Print variables and values'''  # there has to be a better way to do this!
-        print "title: ", self.title
+        print "title: ", self.title_name
         print "starting_monthly_demand: ", self.starting_monthly_demand
         print "number_months:", self.number_months
+
+    def __repr__(self):
+        return "title: %s\nstarting monthly demand: %s\nnumber months: %s" %(self.title_name, self.starting_monthly_demand, self.number_months)
 
     def calc_forecast(self):
         '''Returns two lists holding a sequential month number and a second with
@@ -81,15 +84,44 @@ class Title_Demand_Plan(Demand_Plan):
 
 
 
-class Title_Returns_Plan(Demand_Plan):
-    def __init__(self, title, returns_rate, lag):
-        self.title = title
+
+class Aggressive_Demand_Plan(Demand_Plan):
+    # self.starting_monthly_demand *= 2 # would return an error, there's no
+    # starting_monthly_demand defined
+
+    def __init__(self, *args):
+        super(Aggressive_Demand_Plan, self).__init__(self, *args)
+        #Demand_Plan.__init__(self, *args) # also an option
+        #super().__init__(self, *args) ## Python 3
+        self.starting_monthly_demand *= 2
+        self.forecast = self.calc_forecast()
+
+
+
+
+class Conservative_Demand_Plan(Demand_Plan):
+    def __init__(self, *args):
+        super(Conservative_Demand_Plan, self).__init__(self, *args)
+        self.starting_monthly_demand /= 2.0
+        self.forecast = self.calc_forecast()
+
+
+
+
+
+
+
+class Title_Returns_Plan(object):
+    def __init__(self, demand_plan, returns_rate, lag):
+        self.title_name = demand_plan.title_name
+        self.forecast = demand_plan.forecast
         self.returns_rate = returns_rate
         self.lag = lag
+
     
     def output(self):
         ''' Print variables and values'''  # there has to be a better way to do this!
-        print "title: ", self.title
+        print "title: ", self.title_name
         print "returns_rate: ", self.returns_rate
         print "lag:", self.lag
 
@@ -173,15 +205,15 @@ path = '/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/'
 if __name__ == '__main__':
     print "------------------- Unit tests -------------------"
     
-    cost = cost = {'perOrder': 80.0, 'WACC': 0.12, 'POD_vmc': 5.0, 'fmc': 1000, 
-        'vmc': 2.0, 'lost_margin': 10.00, 'allow_POD':True}
+    cost = {'perOrder': 80.0, 'WACC': 0.12, 'POD_vmc': 5.0, 'fmc': 1000, 
+            'vmc': 2.0, 'lost_margin': 10.00, 'allow_POD':True}
 
     print "\n-------------test class Title-------------"
     xyz = Title("xyz", cost)
     print "xyz:", xyz
     xyz.output()
 
-    print "\n-------------test class Title_Demand_Plan-------------"
+    print "\n-------------test class Demand_Plan-------------"
     starting_monthly_demand = 1000
     number_months = 36
     trendPerMonth = -0.05
@@ -190,23 +222,20 @@ if __name__ == '__main__':
     initial_cv = 0.15
     per_period_cv = 0.015
 
-    title_demand_plan_1 = Title_Demand_Plan("xyz", starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
-    print "title_demand_plan_1:", title_demand_plan_1
-    title_demand_plan_1.output()
-    print title_demand_plan_1.calc_forecast()  # shouldn't this pull arguments from the object?
-    print title_demand_plan_1.calc_sd_forecast()
+    demand_plan_1 = Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
+    print "demand_plan_1:", demand_plan_1
+    demand_plan_1.output()
+    print demand_plan_1.calc_forecast()  # shouldn't this pull arguments from the object?
+    print demand_plan_1.calc_sd_forecast()
 
     print  "\n-------------test class Title_Returns_Plan-------------"
 
     returns_rate = 0.2
     lag = 3
-    title_returns_plan_1 = Title_Returns_Plan("xyz", returns_rate, lag)
+    title_returns_plan_1 = Title_Returns_Plan(demand_plan_1, returns_rate, lag)
     title_returns_plan_1.output()
     # title_returns_plan_1.calc_returns_forecast()
 
-    print "\n-------------test class Demand_Plan-------------"
-
-    demand_plan_1 = Demand_Plan(xyz, title_demand_plan_1, title_returns_plan_1)
 
 
 
