@@ -107,8 +107,20 @@ class Returns_Plan(object):
 class Purchase_Plan(object):
     """Base class for purchasing strategies"""
 
-    def __init__(self, title):
+    def __init__(self, title, demand_plan, returns_plan, print_plan, ss_plan, order_n_months_supply, reorder_point = None, inv_0 = 0):
         self.title_name = title.title_name
+        self.cost = title.cost
+        self.months = demand_plan.months
+        self.forecast = demand_plan.forecast
+        self.sd_forecast = demand_plan.sd_forecast
+        self.returns = returns_plan.returns
+        self.POD_breakeven = self.calc_POD_breakeven()
+        self.order_n_months_supply = order_n_months_supply
+        self.reorder_point = reorder_point
+        self.inv_0 = inv_0
+        self.orders, self.POD_orders, self.starting_inventory, self.ending_inventory, self.average_inventory = self.determine_plan()
+
+        self.FMC, self.VMC, self.POD_VMC, self.umc, self.carry_stg_cost, self.lost_sales_expected = self.calc_costs()
 
     def __repr__(self):
         return str(self.__dict__)
@@ -116,14 +128,123 @@ class Purchase_Plan(object):
     def subclassable_fn(self):
         raise NotImplementedError # fn that's going to be implemented in a subclass
 
-    def plot(self):
-        # plots relevant metrics
-        pass
+    def calc_POD_breakeven(self):
+        # note that this should really incorporate WACC
+        return self.cost['fmc']/(self.cost['POD_vmc']-self.cost['vmc'])
 
 
-class month_supply(Purchase_Plan):
+    def determine_plan(self):
+        if self.reorder_point == None:
+            self.reorder_point = [0] * len(self.months)
+
+        starting_inventory = []
+        ending_inventory = []
+        average_inventory = []
+        POD_orders = [0]*len(self.forecast)
+        orders=[0]*len(self.forecast)
+
+        for i, fcst in enumerate(self.forecast):
+            # calculate starting inventory
+            if i == 0:
+                starting_inventory.append(self.inv_0)
+            else:
+                starting_inventory.append(ending_inventory[i-1])
+            # calculate trial ending inventory
+            trial_ending_inventory = starting_inventory[i] - fcst + self.returns[i]
+            # if trial ending inventory < ROP, place order
+            if trial_ending_inventory < self.reorder_point[i]:
+                # determine order quantity
+                # orders = current shortfall + order quantity
+                n=self.order_n_months_supply
+                terminal = min(i+n, len(self.reorder_point)-1)  # used to make sure index doesn't exceed length of list
+                orders[i] = sum(self.forecast[i:i+n])-sum(self.returns[i:i+n])-starting_inventory[i]+self.reorder_point[terminal]
+                # order POD if the size of the order is too small
+                # POD order quantity will be just what is needed in the current month
+                if orders[i] < self.POD_breakeven and self.cost['allow_POD'] == True:
+                    POD_orders[i] = max(self.forecast[i]-starting_inventory[i]-self.returns[i],0)
+                    orders[i] = 0
+            else:
+                orders[i] = 0
+            # calculate ending inventory from inventory balance equation
+            ending_inventory.append(starting_inventory[i] - self.forecast[i] + self.returns[i]
+                                        + orders[i] + POD_orders[i])
+            #print i
+            #print "orders:", orders[i]
+            #print "POD_orders:", POD_orders[i]
+            #print "start_inv:", starting_inventory[i]
+            #print "end_inv:", ending_inventory[i]
+
+            # calculate average inventory in order to calculate period carrying cost
+            average_inventory.append((starting_inventory[i]+ending_inventory[i])/2)
+
+        return orders, POD_orders, starting_inventory, ending_inventory, average_inventory
+
+    def calc_expected_lost_sales(self, inventory, mean_demand, std_dev_demand):
+        '''Utilizes loss function to calculate lost sales'''
+        shortfall = integrate.quad(lambda x: (x-inventory)*stats.norm.pdf(x, loc=mean_demand, 
+                                scale=std_dev_demand), inventory, np.inf)[0]
+        return shortfall
+
+
+    def calc_costs(self):
+        FMC = [self.cost['fmc'] + self.cost['perOrder'] if round(order) else 0 for order in self.orders]
+        VMC = [self.cost['vmc'] * order for order in self.orders]
+        POD_VMC = [self.cost['POD_vmc'] * POD_order for POD_order in self.POD_orders]
+        umc = (sum(FMC)+sum(VMC)+sum(POD_VMC)) / (sum(self.orders)+sum(self.POD_orders)) # approximation - should be a list
+        carry_stg_cost = [float(self.cost['WACC']) / 12 * month_avg * umc for month_avg in self.average_inventory] 
+        lost_sales_expected = [self.cost['lost_margin']*int(self.calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
+                               for inv, ret, order, POD_order, dem, sd in 
+                               zip(self.starting_inventory, self.returns, self.orders, self.POD_orders, self.forecast, self.sd_forecast)]
+
+        return FMC, VMC, POD_VMC, umc, carry_stg_cost, lost_sales_expected
+
+
+
+    def inv_from_demand(demand, orders, POD_orders, returns, inv_0 = 0):  # move to an "Actual class"
+
+        start_inv_act = []
+        start_inv_posn_act = []
+        end_inv_act = []
+        end_inv_posn_act = []
+        avg_inv_act = []
+
+        for i, order in enumerate(orders):
+            # calculate starting inventory
+            if i == 0:
+                start_inv_act.append(max(0,inv_0))  # eventually replace this with an optional input
+                start_inv_posn_act.append(0)
+            else:
+                start_inv_act.append(end_inv_act[i-1])
+                start_inv_posn_act.append(end_inv_posn_act[i-1])
+            
+            # calculate ending inventory from inventory balance equation
+            end_inv_act.append(max(0,start_inv_act[i] - demand[i] + orders[i] + 
+                                   POD_orders[i] + returns[i]))
+            end_inv_posn_act.append(start_inv_posn_act[i] - demand[i] + orders[i] + 
+                                    POD_orders[i] + returns[i])
+
+            # calculate average inventory in order to calculate period carrying cost
+            avg_inv_act.append((start_inv_act[i]+end_inv_act[i])/2)
+        
+        return end_inv_posn_act, avg_inv_act
+
+
+    # ----------------------
+
+    def calc_lost_sales_as_POD(cost, start_inv, returns, orders, POD_orders, forecast, sd_forecast):  #  this goes in the SS Plan class
+        lost_sales_as_POD = [cost['POD_vmc']*int(calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
+                                   for inv, ret, order, POD_order, dem, sd in 
+                                   zip(start_inv, returns, orders, POD_orders, forecast, sd_forecast)]
+        return lost_sales_as_POD
+
+
+class Months_Supply(Purchase_Plan):
+    def __init__(self, month_supply):
+        self.month_supply = month_supply
+
+
     def subclassable_fn(self):
-        return 42
+        raise NotImplementedError
 
 class EOQ(Purchase_Plan):
     """Economic Order Quantity"""
@@ -144,11 +265,28 @@ class Print_Plan(object):
 class SS_Plan(object):
     """Base class for safety stock strategies"""
     
-    def __init__(self, title):
+    def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
         self.title_name = title.title_name
+        self.sd_forecast = demand_plan.sd_forecast
+        self.target_service_level = target_service_level
+        self.replen_lead_time = replen_lead_time
+        self.reorder_point = self.calc_reorder_points()
 
     def __repr__(self):
         return str(self.__dict__)
+
+        # develop plan with ROPs loaded
+
+    def calc_reorder_points(self):
+        # ROP = replen_lead_time * fcst + 1.96 *(replen_lead_time*sd**2)**0.5
+
+        service_multiplier = stats.norm.ppf(self.target_service_level, loc=0, scale=1)
+
+        #reorder_point = [int(replen_lead_time*fcst +service_multiplier*(replen_lead_time*sd**2)**0.5) 
+        #                 for fcst, sd in zip(forecast,sd_forecast)]
+        reorder_point = [int(service_multiplier*(self.replen_lead_time)**2*sd) for sd in self.sd_forecast]
+
+        return reorder_point
 
 
 def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan):
@@ -168,18 +306,28 @@ def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Pla
     returns_rate = 0.2
     lag = 3
 
+    # Purchase plan parameters
+    order_n_months_supply = 9
+
+    # SS plan parameters
+    replen_lead_time = 2
+    target_service_level = 0.99
+
 
     d = Demand_Plan(title, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
     r = Returns_Plan(title, d, returns_rate, lag)
     pr = Print_Plan(title)
-    pu = Purchase_Plan(title)
-    ss = SS_Plan(title)
+
+    ss = SS_Plan(title, d, target_service_level, replen_lead_time)
+    pu = Purchase_Plan(title, d, r, pr, ss, order_n_months_supply)
 
     # put complete data frame and summary stats in here, but for now...
 
-    stats = map(sum, [d.forecast, r.returns])
+    stats = map(sum, [d.forecast, r.returns, pu.orders])
 
-    return stats
+    scenario_costs = map(sum, [pu.FMC, pu.VMC, pu.POD_VMC, pu.carry_stg_cost, pu.lost_sales_expected])
+
+    return stats, scenario_costs, sum(scenario_costs)
 
 # ### in scenario.py:
 # for pp in plans.purchasing_plans:
@@ -252,17 +400,27 @@ if __name__ == '__main__':
     print_plan_1 = Print_Plan(xyz)
     print "object print_plan_1:", print_plan_1
 
+    print  "\n------------- test class SS_Plan -------------"
+    replen_lead_time = 2
+    target_service_level = 0.99
+
+    ss_plan_1 = SS_Plan(xyz, demand_plan_1, target_service_level, replen_lead_time)
+    print "object ss_plan_1:", ss_plan_1
+    print "object ss_plan_1 reorder points:", ss_plan_1.reorder_point
+
 
     print  "\n------------- test class Purchase_Plan -------------"
 
-    purchase_plan_1 = Purchase_Plan(xyz)
+    order_n_months_supply = 9
+
+    purchase_plan_1 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1, order_n_months_supply)
     print "object purchase_plan_1:", purchase_plan_1
+    print "object purchase_plan_1 POD breakeven:", purchase_plan_1.POD_breakeven
+    print "object purchase_plan_1 orders:", purchase_plan_1.orders
+    print "object purchase_plan_1 POD orders:", purchase_plan_1.POD_orders
 
 
-    print  "\n------------- test class SS_Plan -------------"
-
-    ss_plan_1 = SS_Plan(xyz)
-    print "object ss_plan_1:", ss_plan_1
+ 
 
     print  "\n------------- test scenario function -------------"
 
