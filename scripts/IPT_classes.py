@@ -107,7 +107,7 @@ class Returns_Plan(object):
 class Purchase_Plan(object):
     """Base class for purchasing strategies"""
 
-    def __init__(self, title, demand_plan, returns_plan, print_plan, ss_plan, order_n_months_supply, reorder_point = None, inv_0 = 0):
+    def __init__(self, title, demand_plan, returns_plan, print_plan, ss_plan, order_n_months_supply, inv_0 = 0):
         self.title_name = title.title_name
         self.cost = title.cost
         self.months = demand_plan.months
@@ -116,7 +116,8 @@ class Purchase_Plan(object):
         self.returns = returns_plan.returns
         self.POD_breakeven = self.calc_POD_breakeven()
         self.order_n_months_supply = order_n_months_supply
-        self.reorder_point = reorder_point
+        self.reorder_point = ss_plan.reorder_point
+        self.SS_as_POD_flag = ss_plan.SS_as_POD_flag
         self.inv_0 = inv_0
         self.orders, self.POD_orders, self.starting_inventory, self.ending_inventory, self.average_inventory = self.determine_plan()
 
@@ -185,14 +186,26 @@ class Purchase_Plan(object):
                                 scale=std_dev_demand), inventory, np.inf)[0]
         return shortfall
 
+    # def calc_lost_sales_as_POD(cost, start_inv, returns, orders, POD_orders, forecast, sd_forecast):  #  this goes in the SS Plan class
+    #     lost_sales_as_POD = [cost['POD_vmc']*int(calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
+    #                                for inv, ret, order, POD_order, dem, sd in 
+    #                                zip(start_inv, returns, orders, POD_orders, forecast, sd_forecast)]
+    #     return lost_sales_as_POD
+
 
     def calc_costs(self):
         FMC = [self.cost['fmc'] + self.cost['perOrder'] if round(order) else 0 for order in self.orders]
         VMC = [self.cost['vmc'] * order for order in self.orders]
         POD_VMC = [self.cost['POD_vmc'] * POD_order for POD_order in self.POD_orders]
         umc = (sum(FMC)+sum(VMC)+sum(POD_VMC)) / (sum(self.orders)+sum(self.POD_orders)) # approximation - should be a list
-        carry_stg_cost = [float(self.cost['WACC']) / 12 * month_avg * umc for month_avg in self.average_inventory] 
-        lost_sales_expected = [self.cost['lost_margin']*int(self.calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
+        carry_stg_cost = [float(self.cost['WACC']) / 12 * month_avg * umc for month_avg in self.average_inventory]
+
+        if self.SS_as_POD_flag == False:
+            loss = self.cost['lost_margin']
+        else:
+            loss = self.cost['POD_vmc']
+
+        lost_sales_expected = [loss*int(self.calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
                                for inv, ret, order, POD_order, dem, sd in 
                                zip(self.starting_inventory, self.returns, self.orders, self.POD_orders, self.forecast, self.sd_forecast)]
 
@@ -231,11 +244,7 @@ class Purchase_Plan(object):
 
     # ----------------------
 
-    def calc_lost_sales_as_POD(cost, start_inv, returns, orders, POD_orders, forecast, sd_forecast):  #  this goes in the SS Plan class
-        lost_sales_as_POD = [cost['POD_vmc']*int(calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
-                                   for inv, ret, order, POD_order, dem, sd in 
-                                   zip(start_inv, returns, orders, POD_orders, forecast, sd_forecast)]
-        return lost_sales_as_POD
+
 
 
 class Months_Supply(Purchase_Plan):
@@ -271,6 +280,7 @@ class SS_Plan(object):
         self.target_service_level = target_service_level
         self.replen_lead_time = replen_lead_time
         self.reorder_point = self.calc_reorder_points()
+        self.SS_as_POD_flag = False
 
     def __repr__(self):
         return str(self.__dict__)
@@ -287,6 +297,16 @@ class SS_Plan(object):
         reorder_point = [int(service_multiplier*(self.replen_lead_time)**2*sd) for sd in self.sd_forecast]
 
         return reorder_point
+
+class SS_Plan_None(SS_Plan):
+    def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
+        self.reorder_point = None
+        self.SS_as_POD_flag = False
+
+class SS_Plan_POD(SS_Plan):
+    def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
+        self.reorder_point = None
+        self.SS_as_POD_flag = True
 
 
 def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan):
@@ -323,11 +343,12 @@ def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Pla
 
     # put complete data frame and summary stats in here, but for now...
 
-    stats = map(sum, [d.forecast, r.returns, pu.orders])
-
     scenario_costs = map(sum, [pu.FMC, pu.VMC, pu.POD_VMC, pu.carry_stg_cost, pu.lost_sales_expected])
 
-    return stats, scenario_costs, sum(scenario_costs)
+    stats = {'forecast' : sum(d.forecast), 'returns' : sum(r.returns), 'orders': sum(pu.orders), 
+        'total cost':sum(scenario_costs), 'scrap': pu.ending_inventory[-1]}
+
+    return stats, scenario_costs
 
 # ### in scenario.py:
 # for pp in plans.purchasing_plans:
@@ -424,8 +445,12 @@ if __name__ == '__main__':
 
     print  "\n------------- test scenario function -------------"
 
-    print scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    print scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    print scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    print "Normal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    print "Aggressive Demand:", scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    print "Conservative Demand:", scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+
+    print "\nNormal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    print "Normal Demand, no SS:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan_None)
+    print "Normal Demand, no SS:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan_POD)
 
 
