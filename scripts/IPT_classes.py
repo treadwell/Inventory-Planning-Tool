@@ -60,6 +60,17 @@ class Demand_Plan(object):
 
         return sd_forecast
 
+    def plot(self):
+        # plot forecast
+        plt.plot(self.months,self.forecast, linewidth=2.0, label='demand forecast')
+        plt.ylabel('Units')
+        plt.xlabel('Month')
+
+        plt.title(self.title_name + ' Forecasted Demand', y=1.05, weight = "bold")
+        plt.legend()
+        #plt.savefig('./output/' + '01_forecast.png',dpi=300)
+        plt.show(1)
+
 class Aggressive_Demand_Plan(Demand_Plan):
      # self.starting_monthly_demand *= 2 # would return an error, there's no
      # starting_monthly_demand defined
@@ -107,7 +118,7 @@ class Returns_Plan(object):
 class Purchase_Plan(object):
     """Base class for purchasing strategies"""
 
-    def __init__(self, title, demand_plan, returns_plan, print_plan, ss_plan, order_n_months_supply, inv_0 = 0):
+    def __init__(self, title, demand_plan, returns_plan, print_plan, ss_plan, order_n_months_supply = 9, inv_0 = 0):
         self.title_name = title.title_name
         self.cost = title.cost
         self.months = demand_plan.months
@@ -309,7 +320,7 @@ class SS_Plan_POD(SS_Plan):
         self.SS_as_POD_flag = True
 
 
-def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan):
+def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan, order_n_months_supply = 9):
     # title should be an actual object
     # the other inputs should be classes
 
@@ -327,7 +338,7 @@ def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Pla
     lag = 3
 
     # Purchase plan parameters
-    order_n_months_supply = 9
+    # order_n_months_supply = 9  # input in function
 
     # SS plan parameters
     replen_lead_time = 2
@@ -371,14 +382,18 @@ path = '/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/'
 if __name__ == '__main__':
     print "------------------- Unit tests -------------------"
     
-    cost = cost = {'perOrder': 80.0, 'WACC': 0.12, 'POD_vmc': 5.0, 'fmc': 1000, 
+    cost = {'perOrder': 80.0, 'WACC': 0.12, 'POD_vmc': 5.0, 'fmc': 1000, 
         'vmc': 2.0, 'lost_margin': 10.00, 'allow_POD':True}
 
+
     print "\n------------- test class Title -------------"
+    
     xyz = Title("xyz", cost)
     print "object xyz:", xyz
 
+
     print "\n------------- test class Demand_Plan -------------"
+    
     starting_monthly_demand = 1000
     number_months = 36
     trendPerMonth = -0.05
@@ -393,8 +408,11 @@ if __name__ == '__main__':
     print "months:", demand_plan_1.months
     print "forecast:", demand_plan_1.forecast
     print "sd_forecast:", demand_plan_1.sd_forecast
+    # demand_plan_1.plot()  # this works
+
 
     print "\n------------- test class Aggressive_Demand_Plan -------------"
+    
     demand_plan_2 = Aggressive_Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
     
     print "months:", demand_plan_2.months
@@ -402,6 +420,7 @@ if __name__ == '__main__':
     print "sd_forecast:", demand_plan_2.sd_forecast
 
     print "\n------------- test class Conservative_Demand_Plan -------------"
+    
     demand_plan_3 = Conservative_Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
     
     print "months:", demand_plan_3.months
@@ -410,6 +429,7 @@ if __name__ == '__main__':
 
 
     print  "\n------------- test class Returns_Plan -------------"
+    
     returns_rate = 0.2
     lag = 3
     returns_plan_1 = Returns_Plan(xyz, demand_plan_1, returns_rate, lag)
@@ -422,6 +442,7 @@ if __name__ == '__main__':
     print "object print_plan_1:", print_plan_1
 
     print  "\n------------- test class SS_Plan -------------"
+    
     replen_lead_time = 2
     target_service_level = 0.99
 
@@ -432,16 +453,16 @@ if __name__ == '__main__':
 
     print  "\n------------- test class Purchase_Plan -------------"
 
-    order_n_months_supply = 9
-
-    purchase_plan_1 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1, order_n_months_supply)
+    purchase_plan_1 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1)
     print "object purchase_plan_1:", purchase_plan_1
     print "object purchase_plan_1 POD breakeven:", purchase_plan_1.POD_breakeven
     print "object purchase_plan_1 orders:", purchase_plan_1.orders
     print "object purchase_plan_1 POD orders:", purchase_plan_1.POD_orders
+    purchase_plan_2 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1, 5)
 
+    print "purchase plan 1 orders:", sum(purchase_plan_1.orders)
+    print "purchase plan 2 orders:", sum(purchase_plan_2.orders)
 
- 
 
     print  "\n------------- test scenario function -------------"
 
@@ -449,8 +470,10 @@ if __name__ == '__main__':
     print "Aggressive Demand:", scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
     print "Conservative Demand:", scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
 
-    print "\nNormal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    print "Normal Demand, no SS:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan_None)
-    print "Normal Demand, no SS:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan_POD)
-
+    print "\nCompare various safety stock and months supply scenarios"
+    for ss_scenario in [SS_Plan, SS_Plan_None, SS_Plan_POD]:
+        print "\t",ss_scenario
+        for i in [6, 9, 12, 18, 36]:
+            print "\t\tTotal Cost for", i, "mo supply:", locale.currency(scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, 
+                    Purchase_Plan, ss_scenario, i)[0]['total cost'], grouping = True)
 
