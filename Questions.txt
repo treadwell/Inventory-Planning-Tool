@@ -6,24 +6,21 @@ Use cases
 3. compare the best ways to handle titles of different types to see how they should be handled
 4. Look at various actual instances of a plan to see what an actual demand pattern (or many demand patterns) might look like
 
-To-do
-1. link lead times to printing technologies
-2. Evaluate multiple technologies over the life of a title (scalloped technology curves with breakeven points)
-	a.  alternatives
-		a. conventional domestic
-		b. international or EMP
-		c. digital printing
-		d. single unit digital printing
-	b. approach
-		1. put in a UMC/VMC for every choice
-			{"tech_name": "POD", "FMC" : 0, "VMC" : 5.00, "weeks_lead_time" : 1}
-			# this will eventually be replaced with a spec look up and potentially use price breaks
-		2. have plan select the best for every print order, calc_print_qty()
-			a. use one function for months supply
-			b. use another function for EOQ
-			c. have a flag that determines which one
-		3. output different order streams for each technology
-3. split calc_orders from calc_print_qty from calc_inventory levels from calc_costs
+Backlog
+1. recalculate ROPs whenever there is a printing <= critical
+2. Implement an EOQ function (flag? subclass?)
+3. link lead times to printing technologies (?)
+4. Implement scenario-group class to capture the plotting
+5. Fix the total cost plots for the new costs
+6. Implement plots for scenario-groups that can take a larger number of scenarios
+7. Implement optimization as a print plan
+8. Implement class unit testing with assertions (versus printing everything)
+
+Questions
+1. Code review
+2. does recalculating demand variance and ROPs with a printing, mean my class structure is wrong?
+	a. the variance is a function of the purchase plan
+
 
 
 -------- old ones -----------
