@@ -130,11 +130,14 @@ class Purchase_Plan(object):
         self.reorder_point = ss_plan.reorder_point
         self.SS_as_POD_flag = ss_plan.SS_as_POD_flag
         self.inv_0 = inv_0
-        # self.starting_inventory = []
-        # self.starting_inventory[0] = inv_0
-        self.orders, self.POD_orders, self.starting_inventory, self.ending_inventory, self.average_inventory = self.determine_plan()
+        self.orders, self.POD_orders, self.starting_inventory, self.ending_inventory, self.average_inventory, \
+                self.digital_orders, self.offshore_orders = self.determine_plan()
 
-        self.FMC, self.VMC, self.POD_VMC, self.umc, self.carry_stg_cost, self.lost_sales_expected = self.calc_costs()
+        self.POD_FMC, self.conv_FMC, self.digital_FMC, self.offshore_FMC, self.POD_VMC, self.conv_VMC, \
+                self.digital_VMC, self.offshore_VMC, self.umc, \
+                self.carry_stg_cost, self.lost_sales_expected = self.calc_costs()
+        self.total_cost =  sum(self.POD_FMC + self.conv_FMC + self.digital_FMC + self.offshore_FMC + self.POD_VMC + self.conv_VMC + \
+                self.digital_VMC + self.offshore_VMC + self.carry_stg_cost + self.lost_sales_expected)
 
     def __repr__(self):
         return str(self.__dict__)
@@ -151,14 +154,42 @@ class Purchase_Plan(object):
         # orders = n months net demand
         n=self.order_n_months_supply
         #terminal = min(i+n, len(self.reorder_point)-1)  # used to make sure index doesn't exceed length of list
-        order = sum(forecast[i:i+n])-sum(returns[i:i+n])#-starting_inventory
+        qty = sum(forecast[i:i+n])-sum(returns[i:i+n])#-starting_inventory
         POD_order = 0
-        # order POD if the size of the order is too small
-        # POD order quantity will be just what is needed in the current month
-        if order < self.POD_breakeven and self.cost['allow_POD'] == True:
-            POD_order = max(forecast[i]-returns[i],0)
-            order = 0
-        return order, POD_order
+        digital_umc = (self.cost['Printing']['Digital'][0] + self.cost['Printing']['Digital'][1] * qty)/qty
+        conventional_umc = (self.cost['Printing']['Conventional'][0] + self.cost['Printing']['Conventional'][1] * qty)/qty
+        POD_umc = self.cost['Printing']['POD'][1]
+        offshore_umc = (self.cost['Printing']['Offshore'][0] + self.cost['Printing']['Offshore'][1] * qty)/qty
+        # print 'order:', qty
+        # print 'POD UMC:', POD_umc
+        # print 'digital UMC', digital_umc
+        # print 'conventional UMC', conventional_umc
+        if POD_umc == min(POD_umc, digital_umc, conventional_umc, offshore_umc):  # POD wins
+            POD_order = max(0, (forecast[i] - returns[i])) # only return one month of supply
+            digital_order = 0
+            conventional_order = 0
+            offshore_order = 0
+            # print "POD wins", POD_order, POD_umc
+        elif digital_umc == min(POD_umc, digital_umc, conventional_umc, offshore_umc): # digital wins
+            POD_order = 0
+            digital_order = qty
+            conventional_order = 0
+            offshore_order = 0
+            # print "digital wins", digital_order, digital_umc
+        elif offshore_umc == min(POD_umc, digital_umc, conventional_umc, offshore_umc): # digital wins
+            POD_order = 0
+            digital_order = 0
+            conventional_order = 0
+            offshore_order = qty
+            # print "digital wins", digital_order, digital_umc
+        else:  # conventional wins
+            POD_order = 0
+            digital_order = 0
+            conventional_order = qty
+            offshore_order = 0
+            # print "conventional wins", conventional_order, conventional_umc
+
+        return conventional_order, POD_order, digital_order, offshore_order
 
 
     def determine_plan(self):
@@ -170,6 +201,8 @@ class Purchase_Plan(object):
         average_inventory = []
         POD_orders = [0]*len(self.forecast)
         orders=[0]*len(self.forecast)
+        digital_orders = [0]*len(self.forecast)
+        offshore_orders=[0]*len(self.forecast)
 
         for i, fcst in enumerate(self.forecast):
             # calculate starting inventory
@@ -182,30 +215,21 @@ class Purchase_Plan(object):
             # if trial ending inventory < ROP, place order
             if trial_ending_inventory < self.reorder_point[i]:
                 # determine order quantity
-                orders[i], POD_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
-                # n=self.order_n_months_supply
-                # terminal = min(i+n, len(self.reorder_point)-1)  # used to make sure index doesn't exceed length of list
-                # orders[i] = sum(self.forecast[i:i+n])-sum(self.returns[i:i+n])-starting_inventory[i]+self.reorder_point[terminal]
-                # # order POD if the size of the order is too small
-                # # POD order quantity will be just what is needed in the current month
-                # if orders[i] < self.POD_breakeven and self.cost['allow_POD'] == True:
-                #     POD_orders[i] = max(self.forecast[i]-starting_inventory[i]-self.returns[i],0)
-                #     orders[i] = 0
+                orders[i], POD_orders[i], digital_orders[i], offshore_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
+
             else:
                 orders[i] = 0
+                digital_orders[i] = 0
+                offshore_orders[i] = 0
+                POD_orders[i] = 0
             # calculate ending inventory from inventory balance equation
             ending_inventory.append(starting_inventory[i] - self.forecast[i] + self.returns[i]
-                                        + orders[i] + POD_orders[i])
-            #print i
-            #print "orders:", orders[i]
-            #print "POD_orders:", POD_orders[i]
-            #print "start_inv:", starting_inventory[i]
-            #print "end_inv:", ending_inventory[i]
+                                        + orders[i] + POD_orders[i] + digital_orders[i] + offshore_orders[i])
 
             # calculate average inventory in order to calculate period carrying cost
             average_inventory.append((starting_inventory[i]+ending_inventory[i])/2)
 
-        return orders, POD_orders, starting_inventory, ending_inventory, average_inventory
+        return orders, POD_orders, starting_inventory, ending_inventory, average_inventory, digital_orders, offshore_orders
 
     def calc_expected_lost_sales(self, inventory, mean_demand, std_dev_demand):
         '''Utilizes loss function to calculate lost sales'''
@@ -221,22 +245,37 @@ class Purchase_Plan(object):
 
 
     def calc_costs(self):
-        FMC = [self.cost['fmc'] + self.cost['perOrder'] if round(order) else 0 for order in self.orders]
-        VMC = [self.cost['vmc'] * order for order in self.orders]
-        POD_VMC = [self.cost['POD_vmc'] * POD_order for POD_order in self.POD_orders]
-        umc = (sum(FMC)+sum(VMC)+sum(POD_VMC)) / (sum(self.orders)+sum(self.POD_orders)) # approximation - should be a list
+        #FMC = [self.cost['fmc'] + self.cost['perOrder'] if round(order) else 0 for order in self.orders]  # cut this one
+        POD_FMC = [self.cost['Printing']["POD"][0] + self.cost['perOrder'] if round(POD_order) else 0 for POD_order in self.POD_orders]
+        conv_FMC = [self.cost['Printing']["Conventional"][0] + self.cost['perOrder'] if round(order) else 0 for order in self.orders]
+        digital_FMC = [self.cost['Printing']["Digital"][0] + self.cost['perOrder'] if round(digital_order) else 0 for digital_order in self.digital_orders]
+        offshore_FMC = [self.cost['Printing']["Offshore"][0] + self.cost['perOrder'] if round(offshore_order) else 0 for offshore_order in self.offshore_orders]
+
+        sum_FMC = sum(POD_FMC + conv_FMC + digital_FMC + offshore_FMC)
+
+        #VMC = [self.cost['vmc'] * order for order in self.orders]  # cut this one
+        POD_VMC = [self.cost['Printing']["POD"][1] * POD_order for POD_order in self.POD_orders]
+        conv_VMC = [self.cost['Printing']["Conventional"][1] * order for order in self.orders]
+        digital_VMC = [self.cost['Printing']["Digital"][1] * digital_order for digital_order in self.digital_orders]
+        offshore_VMC = [self.cost['Printing']["Offshore"][1] * offshore_order for offshore_order in self.offshore_orders]
+
+        sum_VMC = sum(POD_VMC + conv_VMC + digital_VMC + offshore_VMC)
+
+        sum_orders = sum(self.orders + self.POD_orders + self.digital_orders + self.offshore_orders)
+
+        umc = (sum_FMC + sum_VMC) / sum_orders # approximation - should be a list
         carry_stg_cost = [float(self.cost['WACC']) / 12 * month_avg * umc for month_avg in self.average_inventory]
 
         if self.SS_as_POD_flag == False:
             loss = self.cost['lost_margin']
         else:
-            loss = self.cost['POD_vmc']
+            loss = self.cost['Printing']["POD"][1]
 
-        lost_sales_expected = [loss*int(self.calc_expected_lost_sales(inv+ret+order+POD_order, dem, sd)) 
-                               for inv, ret, order, POD_order, dem, sd in 
-                               zip(self.starting_inventory, self.returns, self.orders, self.POD_orders, self.forecast, self.sd_forecast)]
+        lost_sales_expected = [loss*int(self.calc_expected_lost_sales(inv+ret+order+POD_order+digital_order+offshore_order, dem, sd)) 
+                               for inv, ret, order, POD_order, digital_order, offshore_order, dem, sd in 
+                               zip(self.starting_inventory, self.returns, self.orders, self.POD_orders, self.digital_orders, self.offshore_orders, self.forecast, self.sd_forecast)]
 
-        return FMC, VMC, POD_VMC, umc, carry_stg_cost, lost_sales_expected
+        return POD_FMC, conv_FMC, digital_FMC, offshore_FMC, POD_VMC, conv_VMC, digital_VMC, offshore_VMC, umc, carry_stg_cost, lost_sales_expected
 
 
 
@@ -370,12 +409,12 @@ def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Pla
 
     # put complete data frame and summary stats in here, but for now...
 
-    scenario_costs = map(sum, [pu.FMC, pu.VMC, pu.POD_VMC, pu.carry_stg_cost, pu.lost_sales_expected])
+    # scenario_costs = map(sum, [pu.FMC, pu.VMC, pu.POD_VMC, pu.carry_stg_cost, pu.lost_sales_expected])
 
     stats = {'forecast' : sum(d.forecast), 'returns' : sum(r.returns), 'orders': sum(pu.orders), 
-        'total cost':sum(scenario_costs), 'scrap': pu.ending_inventory[-1]}
+        'total cost': pu.total_cost, 'scrap': pu.ending_inventory[-1]}
 
-    return stats, scenario_costs
+    return stats
 
 # ### in scenario.py:
 # for pp in plans.purchasing_plans:
@@ -399,7 +438,8 @@ if __name__ == '__main__':
     print "------------------- Unit tests -------------------"
     
     cost = {'perOrder': 80.0, 'WACC': 0.12, 'POD_vmc': 5.0, 'fmc': 1000, 
-        'vmc': 2.0, 'lost_margin': 10.00, 'allow_POD':True}
+        'vmc': 2.0, 'lost_margin': 10.00, 'allow_POD':True, "Printing": {"POD": (0, 4.7), "Digital": (100, 1.43), "Conventional": (1625, 1.00),
+        "Offshore":(2000, 1.50)}}
 
 
     print "\n------------- test class Title -------------"
@@ -490,32 +530,36 @@ if __name__ == '__main__':
     purchase_plan_2 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_2)
     # print "object purchase_plan_1:", purchase_plan_1
     # print "object purchase_plan_1 POD breakeven:", purchase_plan_1.POD_breakeven
-    print "Orders, no ss:", purchase_plan_1.orders
-    print sum(purchase_plan_1.orders)
-    print "POD orders, no ss:", purchase_plan_1.POD_orders
+    print "Conv. orders, no ss:", purchase_plan_1.orders, sum(purchase_plan_1.orders)
+    print "Digital orders, no ss:", purchase_plan_1.digital_orders, sum(purchase_plan_1.digital_orders)
+    print "POD orders, no ss:", purchase_plan_1.POD_orders, sum(purchase_plan_1.POD_orders)
+    print "Offshore orders, no ss:", purchase_plan_1.offshore_orders, sum(purchase_plan_1.offshore_orders)
+    print "Total cost:", purchase_plan_1.total_cost
     #
-    print "Orders w ss", purchase_plan_2.orders
+    print "\nPurchase plan with safety stock"
+    print "-------------------------------"
+
     print "Demand", demand_plan_1.forecast
     print "Returns", returns_plan_1.returns
     print "Reorder Points", ss_plan_2.reorder_point
-    print sum(purchase_plan_2.orders)
-    print "POD order w ss", purchase_plan_2.POD_orders
-    # purchase_plan_2 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1, 5)
-
-    # print "purchase plan 1 orders:", sum(purchase_plan_1.orders)
-    # print "purchase plan 2 orders:", sum(purchase_plan_2.orders)
+    print "Starting Inventory:", purchase_plan_2.starting_inventory
+    print "Conv. orders w ss", purchase_plan_2.orders, sum(purchase_plan_2.orders)
+    print "Digital orders, w ss:", purchase_plan_2.digital_orders, sum(purchase_plan_2.digital_orders)
+    print "POD orders, w ss:", purchase_plan_2.POD_orders, sum(purchase_plan_2.POD_orders)
+    print "Offshore orders, w ss:", purchase_plan_2.offshore_orders, sum(purchase_plan_2.offshore_orders)
+    print "Total cost:", purchase_plan_2.total_cost
 
 
     print  "\n------------- test scenario function -------------"
 
-    # print "Normal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    # print "Aggressive Demand:", scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    # print "Conservative Demand:", scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    print "Normal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    print "Aggressive Demand:", scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    print "Conservative Demand:", scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
 
-    # print "\nCompare various safety stock and months supply scenarios"
-    # for ss_scenario in [SS_Plan, SS_Plan_None, SS_Plan_POD]:
-    #     print "\t",ss_scenario
-    #     for i in [6, 9, 12, 18, 36]:
-    #         print "\t\tTotal Cost for", i, "mo supply:", locale.currency(scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, 
-    #                 Purchase_Plan, ss_scenario, i)[0]['total cost'], grouping = True)
+    print "\nCompare various safety stock and months supply scenarios"
+    for ss_scenario in [SS_Plan, SS_Plan_None, SS_Plan_POD]:
+        print "\t", ss_scenario
+        for i in [6, 9, 12, 18, 36]:
+            print "\t\tTotal Cost for", i, "mo supply:", locale.currency(scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, 
+                    Purchase_Plan, ss_scenario, i)['total cost'], grouping = True)
 
