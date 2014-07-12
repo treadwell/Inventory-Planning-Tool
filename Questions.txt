@@ -15,8 +15,13 @@ To-do
 		c. digital printing
 		d. single unit digital printing
 	b. approach
-		1. put in a UMC/VMC for every choice (possibly price breaks?)
-		2. have plan select the best for every print order
+		1. put in a UMC/VMC for every choice
+			{"tech_name": "POD", "FMC" : 0, "VMC" : 5.00, "weeks_lead_time" : 1}
+			# this will eventually be replaced with a spec look up and potentially use price breaks
+		2. have plan select the best for every print order, calc_print_qty()
+			a. use one function for months supply
+			b. use another function for EOQ
+			c. have a flag that determines which one
 		3. output different order streams for each technology
 3. split calc_orders from calc_print_qty from calc_inventory levels from calc_costs
 

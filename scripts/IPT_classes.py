@@ -130,6 +130,8 @@ class Purchase_Plan(object):
         self.reorder_point = ss_plan.reorder_point
         self.SS_as_POD_flag = ss_plan.SS_as_POD_flag
         self.inv_0 = inv_0
+        # self.starting_inventory = []
+        # self.starting_inventory[0] = inv_0
         self.orders, self.POD_orders, self.starting_inventory, self.ending_inventory, self.average_inventory = self.determine_plan()
 
         self.FMC, self.VMC, self.POD_VMC, self.umc, self.carry_stg_cost, self.lost_sales_expected = self.calc_costs()
@@ -143,6 +145,20 @@ class Purchase_Plan(object):
     def calc_POD_breakeven(self):
         # note that this should really incorporate WACC
         return self.cost['fmc']/(self.cost['POD_vmc']-self.cost['vmc'])
+
+    def calc_order_qty(self, i, forecast, returns):
+        # determine order quantity
+        # orders = n months net demand
+        n=self.order_n_months_supply
+        #terminal = min(i+n, len(self.reorder_point)-1)  # used to make sure index doesn't exceed length of list
+        order = sum(forecast[i:i+n])-sum(returns[i:i+n])#-starting_inventory
+        POD_order = 0
+        # order POD if the size of the order is too small
+        # POD order quantity will be just what is needed in the current month
+        if order < self.POD_breakeven and self.cost['allow_POD'] == True:
+            POD_order = max(forecast[i]-returns[i],0)
+            order = 0
+        return order, POD_order
 
 
     def determine_plan(self):
@@ -166,15 +182,15 @@ class Purchase_Plan(object):
             # if trial ending inventory < ROP, place order
             if trial_ending_inventory < self.reorder_point[i]:
                 # determine order quantity
-                # orders = current shortfall + order quantity
-                n=self.order_n_months_supply
-                terminal = min(i+n, len(self.reorder_point)-1)  # used to make sure index doesn't exceed length of list
-                orders[i] = sum(self.forecast[i:i+n])-sum(self.returns[i:i+n])-starting_inventory[i]+self.reorder_point[terminal]
-                # order POD if the size of the order is too small
-                # POD order quantity will be just what is needed in the current month
-                if orders[i] < self.POD_breakeven and self.cost['allow_POD'] == True:
-                    POD_orders[i] = max(self.forecast[i]-starting_inventory[i]-self.returns[i],0)
-                    orders[i] = 0
+                orders[i], POD_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
+                # n=self.order_n_months_supply
+                # terminal = min(i+n, len(self.reorder_point)-1)  # used to make sure index doesn't exceed length of list
+                # orders[i] = sum(self.forecast[i:i+n])-sum(self.returns[i:i+n])-starting_inventory[i]+self.reorder_point[terminal]
+                # # order POD if the size of the order is too small
+                # # POD order quantity will be just what is needed in the current month
+                # if orders[i] < self.POD_breakeven and self.cost['allow_POD'] == True:
+                #     POD_orders[i] = max(self.forecast[i]-starting_inventory[i]-self.returns[i],0)
+                #     orders[i] = 0
             else:
                 orders[i] = 0
             # calculate ending inventory from inventory balance equation
@@ -224,33 +240,33 @@ class Purchase_Plan(object):
 
 
 
-    def inv_from_demand(demand, orders, POD_orders, returns, inv_0 = 0):  # move to an "Actual class"
+    def calc_inv(self):  # move to an "Actual class"
 
-        start_inv_act = []
-        start_inv_posn_act = []
-        end_inv_act = []
-        end_inv_posn_act = []
-        avg_inv_act = []
+        start_inv = []       # must be >= 0
+        start_inv_posn = []  # can be negative
+        end_inv = []         # must be >= 0
+        end_inv_posn = []    # can be negative
+        avg_inv = []         # must be >= 0
 
         for i, order in enumerate(orders):
             # calculate starting inventory
             if i == 0:
-                start_inv_act.append(max(0,inv_0))  # eventually replace this with an optional input
-                start_inv_posn_act.append(0)
+                start_inv.append(max(0,self.inv_0))  # eventually replace this with an optional input
+                start_inv_posn.append(0)
             else:
-                start_inv_act.append(end_inv_act[i-1])
-                start_inv_posn_act.append(end_inv_posn_act[i-1])
+                start_inv.append(end_inv[i-1])
+                start_inv_posn.append(end_inv_posn[i-1])
             
             # calculate ending inventory from inventory balance equation
-            end_inv_act.append(max(0,start_inv_act[i] - demand[i] + orders[i] + 
-                                   POD_orders[i] + returns[i]))
-            end_inv_posn_act.append(start_inv_posn_act[i] - demand[i] + orders[i] + 
-                                    POD_orders[i] + returns[i])
+            end_inv.append(max(0,start_inv[i] - self.demand[i] + self.orders[i] + 
+                                   self.POD_orders[i] + self.returns[i]))
+            end_inv_posn.append(start_inv_posn[i] - self.demand[i] + self.orders[i] + 
+                                    self.POD_orders[i] + self.returns[i])
 
             # calculate average inventory in order to calculate period carrying cost
-            avg_inv_act.append((start_inv_act[i]+end_inv_act[i])/2)
+            avg_inv.append((start_inv[i]+end_inv[i])/2)
         
-        return end_inv_posn_act, avg_inv_act
+        return end_inv_posn, avg_inv
 
 
     # ----------------------
@@ -403,29 +419,29 @@ if __name__ == '__main__':
     per_period_cv = 0.015
 
     demand_plan_1 = Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
-    print "object demand_plan_1:", demand_plan_1
+    # print "object demand_plan_1:", demand_plan_1
     
-    print "months:", demand_plan_1.months
-    print "forecast:", demand_plan_1.forecast
-    print "sd_forecast:", demand_plan_1.sd_forecast
+    # print "months:", demand_plan_1.months
+    # print "forecast:", demand_plan_1.forecast
+    # print "sd_forecast:", demand_plan_1.sd_forecast
     # demand_plan_1.plot()  # this works
 
 
     print "\n------------- test class Aggressive_Demand_Plan -------------"
     
-    demand_plan_2 = Aggressive_Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
+    # demand_plan_2 = Aggressive_Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
     
-    print "months:", demand_plan_2.months
-    print "forecast:", demand_plan_2.forecast
-    print "sd_forecast:", demand_plan_2.sd_forecast
+    # print "months:", demand_plan_2.months
+    # print "forecast:", demand_plan_2.forecast
+    # print "sd_forecast:", demand_plan_2.sd_forecast
 
     print "\n------------- test class Conservative_Demand_Plan -------------"
     
-    demand_plan_3 = Conservative_Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
+    # demand_plan_3 = Conservative_Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
     
-    print "months:", demand_plan_3.months
-    print "forecast:", demand_plan_3.forecast
-    print "sd_forecast:", demand_plan_3.sd_forecast
+    # print "months:", demand_plan_3.months
+    # print "forecast:", demand_plan_3.forecast
+    # print "sd_forecast:", demand_plan_3.sd_forecast
 
 
     print  "\n------------- test class Returns_Plan -------------"
@@ -433,8 +449,8 @@ if __name__ == '__main__':
     returns_rate = 0.2
     lag = 3
     returns_plan_1 = Returns_Plan(xyz, demand_plan_1, returns_rate, lag)
-    print "object returns_plan_1:", returns_plan_1
-    print "returns:", returns_plan_1.returns
+    # print "object returns_plan_1:", returns_plan_1
+    # print "returns:", returns_plan_1.returns
 
     print  "\n------------- test class Print_Plan -------------"
 
@@ -447,33 +463,59 @@ if __name__ == '__main__':
     target_service_level = 0.99
 
     ss_plan_1 = SS_Plan(xyz, demand_plan_1, target_service_level, replen_lead_time)
-    print "object ss_plan_1:", ss_plan_1
-    print "object ss_plan_1 reorder points:", ss_plan_1.reorder_point
+    # print "object ss_plan_1:", ss_plan_1
+    # print "object ss_plan_1 reorder points:", ss_plan_1.reorder_point
 
 
     print  "\n------------- test class Purchase_Plan -------------"
 
-    purchase_plan_1 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1)
-    print "object purchase_plan_1:", purchase_plan_1
-    print "object purchase_plan_1 POD breakeven:", purchase_plan_1.POD_breakeven
-    print "object purchase_plan_1 orders:", purchase_plan_1.orders
-    print "object purchase_plan_1 POD orders:", purchase_plan_1.POD_orders
-    purchase_plan_2 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1, 5)
+    starting_monthly_demand = 1000
+    number_months = 36
+    trendPerMonth = -0.00
+    seasonCoeffs = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+    #seasonCoeffs = [0.959482026,0.692569699,0.487806875,0.543161208,0.848077745,0.936798779,1.596854431,1.618086981,1.433374588,0.949500605,0.828435702,1.105851362]
+    initial_cv = 0.15
+    per_period_cv = 0.015
 
-    print "purchase plan 1 orders:", sum(purchase_plan_1.orders)
-    print "purchase plan 2 orders:", sum(purchase_plan_2.orders)
+    demand_plan_1 = Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
+    
+    returns_rate = 0.0
+    lag = 3
+    returns_plan_1 = Returns_Plan(xyz, demand_plan_1, returns_rate, lag)
+    
+    ss_plan_1 = SS_Plan_None(xyz, demand_plan_1, target_service_level, replen_lead_time)
+    ss_plan_2 = SS_Plan(xyz, demand_plan_1, target_service_level, replen_lead_time)
+
+    purchase_plan_1 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1)
+    purchase_plan_2 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_2)
+    # print "object purchase_plan_1:", purchase_plan_1
+    # print "object purchase_plan_1 POD breakeven:", purchase_plan_1.POD_breakeven
+    print "Orders, no ss:", purchase_plan_1.orders
+    print sum(purchase_plan_1.orders)
+    print "POD orders, no ss:", purchase_plan_1.POD_orders
+    #
+    print "Orders w ss", purchase_plan_2.orders
+    print "Demand", demand_plan_1.forecast
+    print "Returns", returns_plan_1.returns
+    print "Reorder Points", ss_plan_2.reorder_point
+    print sum(purchase_plan_2.orders)
+    print "POD order w ss", purchase_plan_2.POD_orders
+    # purchase_plan_2 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1, 5)
+
+    # print "purchase plan 1 orders:", sum(purchase_plan_1.orders)
+    # print "purchase plan 2 orders:", sum(purchase_plan_2.orders)
 
 
     print  "\n------------- test scenario function -------------"
 
-    print "Normal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    print "Aggressive Demand:", scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    print "Conservative Demand:", scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    # print "Normal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    # print "Aggressive Demand:", scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    # print "Conservative Demand:", scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
 
-    print "\nCompare various safety stock and months supply scenarios"
-    for ss_scenario in [SS_Plan, SS_Plan_None, SS_Plan_POD]:
-        print "\t",ss_scenario
-        for i in [6, 9, 12, 18, 36]:
-            print "\t\tTotal Cost for", i, "mo supply:", locale.currency(scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, 
-                    Purchase_Plan, ss_scenario, i)[0]['total cost'], grouping = True)
+    # print "\nCompare various safety stock and months supply scenarios"
+    # for ss_scenario in [SS_Plan, SS_Plan_None, SS_Plan_POD]:
+    #     print "\t",ss_scenario
+    #     for i in [6, 9, 12, 18, 36]:
+    #         print "\t\tTotal Cost for", i, "mo supply:", locale.currency(scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, 
+    #                 Purchase_Plan, ss_scenario, i)[0]['total cost'], grouping = True)
 
