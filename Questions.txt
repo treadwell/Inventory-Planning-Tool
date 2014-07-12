@@ -18,9 +18,9 @@ Backlog
 
 Questions
 1. Code review
-2. does recalculating demand variance and ROPs with a printing, mean my class structure is wrong?
-	a. the variance is a function of the purchase plan
-
+2. does recalculating demand variance and ROPs with a printing mean my class structure is wrong?
+	a. the variance is a function of the purchase plan, but it's currently in demand plan
+3. Personal code library?
 
 
 -------- old ones -----------
