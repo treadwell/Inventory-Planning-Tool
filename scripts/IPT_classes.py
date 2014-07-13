@@ -121,6 +121,9 @@ class Purchase_Plan(object):
     def __init__(self, title, demand_plan, returns_plan, print_plan, ss_plan, order_n_months_supply = 9, inv_0 = 0):
         self.title_name = title.title_name
         self.cost = title.cost
+        self.demand_plan = demand_plan
+        # reference months, forecast, etc. on the fly/as needed 
+        ## months = self.demand_plan.months
         self.months = demand_plan.months
         self.forecast = demand_plan.forecast
         self.sd_forecast = demand_plan.sd_forecast
@@ -130,12 +133,17 @@ class Purchase_Plan(object):
         self.reorder_point = ss_plan.reorder_point
         self.SS_as_POD_flag = ss_plan.SS_as_POD_flag
         self.inv_0 = inv_0
+
         self.orders, self.POD_orders, self.starting_inventory, self.ending_inventory, self.average_inventory, \
                 self.digital_orders, self.offshore_orders = self.determine_plan()
 
         self.POD_FMC, self.conv_FMC, self.digital_FMC, self.offshore_FMC, self.POD_VMC, self.conv_VMC, \
                 self.digital_VMC, self.offshore_VMC, self.umc, \
                 self.carry_stg_cost, self.lost_sales_expected = self.calc_costs()
+
+        self.POD_FMC = self.calc_costs()[0]
+        self.calculated_costs = self.calc_costs()
+
         self.total_cost =  sum(self.POD_FMC + self.conv_FMC + self.digital_FMC + self.offshore_FMC + self.POD_VMC + self.conv_VMC + \
                 self.digital_VMC + self.offshore_VMC + self.carry_stg_cost + self.lost_sales_expected)
 
@@ -149,56 +157,44 @@ class Purchase_Plan(object):
         # note that this should really incorporate WACC
         return self.cost['fmc']/(self.cost['POD_vmc']-self.cost['vmc'])
 
+    self.technology_types = ['POD', 'Digital', 'Conventional', 'Offshore']
+
     def calc_order_qty(self, i, forecast, returns):
         # determine order quantity
         # orders = n months net demand
-        n=self.order_n_months_supply
+        n = self.order_n_months_supply
         #terminal = min(i+n, len(self.reorder_point)-1)  # used to make sure index doesn't exceed length of list
         qty = sum(forecast[i:i+n])-sum(returns[i:i+n])#-starting_inventory
-        POD_order = 0
-        digital_umc = (self.cost['Printing']['Digital'][0] + self.cost['Printing']['Digital'][1] * qty)/qty
-        conventional_umc = (self.cost['Printing']['Conventional'][0] + self.cost['Printing']['Conventional'][1] * qty)/qty
-        POD_umc = self.cost['Printing']['POD'][1]
-        offshore_umc = (self.cost['Printing']['Offshore'][0] + self.cost['Printing']['Offshore'][1] * qty)/qty
-        # print 'order:', qty
-        # print 'POD UMC:', POD_umc
-        # print 'digital UMC', digital_umc
-        # print 'conventional UMC', conventional_umc
-        if POD_umc == min(POD_umc, digital_umc, conventional_umc, offshore_umc):  # POD wins
-            POD_order = max(0, (forecast[i] - returns[i])) # only return one month of supply
-            digital_order = 0
-            conventional_order = 0
-            offshore_order = 0
-            # print "POD wins", POD_order, POD_umc
-        elif digital_umc == min(POD_umc, digital_umc, conventional_umc, offshore_umc): # digital wins
-            POD_order = 0
-            digital_order = qty
-            conventional_order = 0
-            offshore_order = 0
-            # print "digital wins", digital_order, digital_umc
-        elif offshore_umc == min(POD_umc, digital_umc, conventional_umc, offshore_umc): # digital wins
-            POD_order = 0
-            digital_order = 0
-            conventional_order = 0
-            offshore_order = qty
-            # print "digital wins", digital_order, digital_umc
-        else:  # conventional wins
-            POD_order = 0
-            digital_order = 0
-            conventional_order = qty
-            offshore_order = 0
-            # print "conventional wins", conventional_order, conventional_umc
 
-        return conventional_order, POD_order, digital_order, offshore_order
+        def get_umc(umc_type):
+            a, b = self.cost['Printing'][umc_type] # can use a slice if tuple has len >2
+            return a/qty + b
+
+        umcs = map(get_umc, self.technology_types)
+
+        orders = [0]*4 # POD_order, Digital_order, Conventional_order, Offshore_order
+        mindex = umcs.index(min(umcs)) # get index of min umc
+        if mindex == 0: # POD wins
+            orders[0] = max(0, (forecast[i] - returns[i])) # only return one month of supply
+            # print "POD wins", POD_order, POD_umc
+        else:
+            orders[mindex] = qty # set appropriate order to qty
+
+        return orders
 
 
     def determine_plan(self):
+        # pass stuff in to functions explicitly; don't use global variables
+        # within the class
         if self.reorder_point == None:
             self.reorder_point = [0] * len(self.months)
 
         starting_inventory = []
         ending_inventory = []
         average_inventory = []
+        starting_invt, average_invt, ending_invt = [], [], []
+        # a = b = c = 3 # don't try this at home
+        # a = b = c = [] # will probably all be one list
         POD_orders = [0]*len(self.forecast)
         orders=[0]*len(self.forecast)
         digital_orders = [0]*len(self.forecast)
@@ -218,6 +214,7 @@ class Purchase_Plan(object):
                 orders[i], POD_orders[i], digital_orders[i], offshore_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
 
             else:
+                # don't need to zero them out, they're initialized as zero
                 orders[i] = 0
                 digital_orders[i] = 0
                 offshore_orders[i] = 0
@@ -260,6 +257,12 @@ class Purchase_Plan(object):
         offshore_VMC = [self.cost['Printing']["Offshore"][1] * offshore_order for offshore_order in self.offshore_orders]
 
         sum_VMC = sum(POD_VMC + conv_VMC + digital_VMC + offshore_VMC)
+
+        # def VMC_cost(order_type):
+        #     [...]
+        #     return foo
+
+        # sum_VMC = sum(map(VMC_cost, order_type))
 
         sum_orders = sum(self.orders + self.POD_orders + self.digital_orders + self.offshore_orders)
 
