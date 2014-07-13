@@ -133,7 +133,11 @@ class Purchase_Plan(object):
         self.reorder_point = ss_plan.reorder_point
         self.SS_as_POD_flag = ss_plan.SS_as_POD_flag
         self.inv_0 = inv_0
+
         self.technology_types = ['POD', 'Digital', 'Conventional', 'Offshore']
+        self.order_types = ['self.POD_orders', 'self.digital_orders', 'self.orders', 'self.offshore_orders']
+        self.FMC_types = ['POD_FMC', 'digital_FMC', 'conv_FMC', 'offshore_FMC']
+        self.VMC_types = ['POD_VMC', 'digital_VMC', 'conv_VMC', 'offshore_VMC']
 
         self.orders, self.POD_orders, self.starting_inventory, self.ending_inventory, self.average_inventory, \
                 self.digital_orders, self.offshore_orders = self.determine_plan()
@@ -235,12 +239,18 @@ class Purchase_Plan(object):
 
     def calc_costs(self):
         #FMC = [self.cost['fmc'] + self.cost['perOrder'] if round(order) else 0 for order in self.orders]  # cut this one
-        POD_FMC = [self.cost['Printing']["POD"][0] + self.cost['perOrder'] if round(POD_order) else 0 for POD_order in self.POD_orders]
-        conv_FMC = [self.cost['Printing']["Conventional"][0] + self.cost['perOrder'] if round(order) else 0 for order in self.orders]
-        digital_FMC = [self.cost['Printing']["Digital"][0] + self.cost['perOrder'] if round(digital_order) else 0 for digital_order in self.digital_orders]
-        offshore_FMC = [self.cost['Printing']["Offshore"][0] + self.cost['perOrder'] if round(offshore_order) else 0 for offshore_order in self.offshore_orders]
+        POD_FMC = [self.cost['Printing']["POD"][0] + self.cost['perOrder'] if round(o) else 0 for o in self.POD_orders]
+        conv_FMC = [self.cost['Printing']["Conventional"][0] + self.cost['perOrder'] if round(o) else 0 for o in self.orders]
+        digital_FMC = [self.cost['Printing']["Digital"][0] + self.cost['perOrder'] if round(o) else 0 for o in self.digital_orders]
+        offshore_FMC = [self.cost['Printing']["Offshore"][0] + self.cost['perOrder'] if round(o) else 0 for o in self.offshore_orders]
 
         sum_FMC = sum(POD_FMC + conv_FMC + digital_FMC + offshore_FMC)
+
+        # for i, FMC_type in enumerate(self.FMC_types):
+        #     FMC_type = [self.cost['Printing'][self.technology_types[i]][0] if round(o) else 0 for o in self.order_types[i]]
+        #     print i, FMC_type, self.technology_types[i], self.cost['Printing'][self.technology_types[i]][0], self.order_types[i]
+
+    
 
         #VMC = [self.cost['vmc'] * order for order in self.orders]  # cut this one
         POD_VMC = [self.cost['Printing']["POD"][1] * POD_order for POD_order in self.POD_orders]
@@ -547,14 +557,14 @@ if __name__ == '__main__':
 
     print  "\n------------- test scenario function -------------"
 
-    print "Normal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    print "Aggressive Demand:", scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
-    print "Conservative Demand:", scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    # print "Normal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    # print "Aggressive Demand:", scenario(xyz, Aggressive_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+    # print "Conservative Demand:", scenario(xyz, Conservative_Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
 
-    print "\nCompare various safety stock and months supply scenarios"
-    for ss_scenario in [SS_Plan, SS_Plan_None, SS_Plan_POD]:
-        print "\t", ss_scenario
-        for i in [6, 9, 12, 18, 36]:
-            print "\t\tTotal Cost for", i, "mo supply:", locale.currency(scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, 
-                    Purchase_Plan, ss_scenario, i)['total cost'], grouping = True)
+    # print "\nCompare various safety stock and months supply scenarios"
+    # for ss_scenario in [SS_Plan, SS_Plan_None, SS_Plan_POD]:
+    #     print "\t", ss_scenario
+    #     for i in [6, 9, 12, 18, 36]:
+    #         print "\t\tTotal Cost for", i, "mo supply:", locale.currency(scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, 
+    #                 Purchase_Plan, ss_scenario, i)['total cost'], grouping = True)
 
