@@ -133,6 +133,7 @@ class Purchase_Plan(object):
         self.reorder_point = ss_plan.reorder_point
         self.SS_as_POD_flag = ss_plan.SS_as_POD_flag
         self.inv_0 = inv_0
+        self.technology_types = ['POD', 'Digital', 'Conventional', 'Offshore']
 
         self.orders, self.POD_orders, self.starting_inventory, self.ending_inventory, self.average_inventory, \
                 self.digital_orders, self.offshore_orders = self.determine_plan()
@@ -157,7 +158,7 @@ class Purchase_Plan(object):
         # note that this should really incorporate WACC
         return self.cost['fmc']/(self.cost['POD_vmc']-self.cost['vmc'])
 
-    self.technology_types = ['POD', 'Digital', 'Conventional', 'Offshore']
+    
 
     def calc_order_qty(self, i, forecast, returns):
         # determine order quantity
