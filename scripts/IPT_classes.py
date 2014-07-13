@@ -193,41 +193,32 @@ class Purchase_Plan(object):
         starting_inventory = []
         ending_inventory = []
         average_inventory = []
-        starting_invt, average_invt, ending_invt = [], [], []
-        # a = b = c = 3 # don't try this at home
-        # a = b = c = [] # will probably all be one list
-        POD_orders = [0]*len(self.forecast)
-        orders=[0]*len(self.forecast)
-        digital_orders = [0]*len(self.forecast)
-        offshore_orders=[0]*len(self.forecast)
+        start_inv, avg_inv, end_inv = [], [], []
+
+        horizon = len(self.forecast)
+        POD_orders, orders, digital_orders, offshore_orders = [0]*horizon, [0]*horizon, [0]*horizon, [0]*horizon
 
         for i, fcst in enumerate(self.forecast):
             # calculate starting inventory
             if i == 0:
-                starting_inventory.append(self.inv_0)
+                start_inv.append(self.inv_0)
             else:
-                starting_inventory.append(ending_inventory[i-1])
+                start_inv.append(end_inv[i-1])
             # calculate trial ending inventory
-            trial_ending_inventory = starting_inventory[i] - fcst + self.returns[i]
+            trial_ending_inventory = start_inv[i] - fcst + self.returns[i]
             # if trial ending inventory < ROP, place order
             if trial_ending_inventory < self.reorder_point[i]:
                 # determine order quantity
                 orders[i], POD_orders[i], digital_orders[i], offshore_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
 
-            else:
-                # don't need to zero them out, they're initialized as zero
-                orders[i] = 0
-                digital_orders[i] = 0
-                offshore_orders[i] = 0
-                POD_orders[i] = 0
             # calculate ending inventory from inventory balance equation
-            ending_inventory.append(starting_inventory[i] - self.forecast[i] + self.returns[i]
+            end_inv.append(start_inv[i] - self.forecast[i] + self.returns[i]
                                         + orders[i] + POD_orders[i] + digital_orders[i] + offshore_orders[i])
 
             # calculate average inventory in order to calculate period carrying cost
-            average_inventory.append((starting_inventory[i]+ending_inventory[i])/2)
+            avg_inv.append((start_inv[i]+end_inv[i])/2)
 
-        return orders, POD_orders, starting_inventory, ending_inventory, average_inventory, digital_orders, offshore_orders
+        return orders, POD_orders, start_inv, end_inv, avg_inv, digital_orders, offshore_orders
 
     def calc_expected_lost_sales(self, inventory, mean_demand, std_dev_demand):
         '''Utilizes loss function to calculate lost sales'''
