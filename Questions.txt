@@ -7,14 +7,17 @@ Use cases
 4. Look at various actual instances of a plan to see what an actual demand pattern (or many demand patterns) might look like
 
 Backlog
-1. recalculate ROPs whenever there is a printing <= critical
+1. Recalculate ROPs whenever there is a printing <= critical
+	a. pull variances and ROPs into purchase_plan
 2. Implement an EOQ function (flag? subclass?)
-3. link lead times to printing technologies (?)
-4. Implement scenario-group class to capture the plotting
-5. Fix the total cost plots for the new costs
-6. Implement plots for scenario-groups that can take a larger number of scenarios
-7. Implement optimization as a print plan
-8. Implement class unit testing with assertions (versus printing everything)
+3. Reduce use of globals in classes
+4. implement print_plan classes
+5. link lead times to printing technologies (?)
+6. Implement scenario-group class to capture the plotting
+7. Fix the total cost plots for the new costs
+8. Implement plots for scenario-groups that can take a larger number of scenarios
+9. Implement optimization as a print plan
+10. Implement class unit testing with assertions (versus printing everything)
 
 Questions
 1. Code review
