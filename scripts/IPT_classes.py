@@ -135,7 +135,7 @@ class Purchase_Plan(object):
         self.inv_0 = inv_0
 
         self.technology_types = ['POD', 'Digital', 'Conventional', 'Offshore']
-        self.order_types = ['self.POD_orders', 'self.digital_orders', 'self.orders', 'self.offshore_orders']
+        self.order_types = ['POD_orders', 'digital_orders', 'orders', 'offshore_orders']
         self.FMC_types = ['POD_FMC', 'digital_FMC', 'conv_FMC', 'offshore_FMC']
         self.VMC_types = ['POD_VMC', 'digital_VMC', 'conv_VMC', 'offshore_VMC']
 
@@ -168,7 +168,7 @@ class Purchase_Plan(object):
         # determine order quantity
         # orders = n months net demand
         n = self.order_n_months_supply
-        #terminal = min(i+n, len(self.reorder_point)-1)  # used to make sure index doesn't exceed length of list
+
         qty = sum(forecast[i:i+n])-sum(returns[i:i+n])#-starting_inventory
 
         def get_umc(umc_type):
@@ -213,7 +213,7 @@ class Purchase_Plan(object):
             # if trial ending inventory < ROP, place order
             if trial_ending_inventory < self.reorder_point[i]:
                 # determine order quantity
-                orders[i], POD_orders[i], digital_orders[i], offshore_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
+                POD_orders[i], digital_orders[i], orders[i], offshore_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
 
             # calculate ending inventory from inventory balance equation
             end_inv.append(start_inv[i] - self.forecast[i] + self.returns[i]
@@ -238,27 +238,27 @@ class Purchase_Plan(object):
 
 
     def calc_costs(self):
-        #FMC = [self.cost['fmc'] + self.cost['perOrder'] if round(order) else 0 for order in self.orders]  # cut this one
-        POD_FMC = [self.cost['Printing']["POD"][0] + self.cost['perOrder'] if round(o) else 0 for o in self.POD_orders]
-        conv_FMC = [self.cost['Printing']["Conventional"][0] + self.cost['perOrder'] if round(o) else 0 for o in self.orders]
-        digital_FMC = [self.cost['Printing']["Digital"][0] + self.cost['perOrder'] if round(o) else 0 for o in self.digital_orders]
-        offshore_FMC = [self.cost['Printing']["Offshore"][0] + self.cost['perOrder'] if round(o) else 0 for o in self.offshore_orders]
+        
+        order_dict = {"POD": self.POD_orders, "Digital": self.digital_orders, "Conventional": self.orders, 
+                "Offshore": self.offshore_orders}
 
-        sum_FMC = sum(POD_FMC + conv_FMC + digital_FMC + offshore_FMC)
+        # Caclulate Fixed Manufacturing Cost (FMC)
 
-        # for i, FMC_type in enumerate(self.FMC_types):
-        #     FMC_type = [self.cost['Printing'][self.technology_types[i]][0] if round(o) else 0 for o in self.order_types[i]]
-        #     print i, FMC_type, self.technology_types[i], self.cost['Printing'][self.technology_types[i]][0], self.order_types[i]
+        FMCs = [[self.cost['Printing'][tt][0] if round(o) else 0 for o in order_dict[tt]]
+                    for tt in self.technology_types]
+       
+        POD_FMC, digital_FMC, conv_FMC, offshore_FMC = FMCs[0], FMCs[1], FMCs[2], FMCs[3]
 
-    
+        sum_FMC = sum(map(sum, FMCs))
+                
+        # Calculate Variable Manufacturing Cost (VMC)
 
-        #VMC = [self.cost['vmc'] * order for order in self.orders]  # cut this one
-        POD_VMC = [self.cost['Printing']["POD"][1] * POD_order for POD_order in self.POD_orders]
-        conv_VMC = [self.cost['Printing']["Conventional"][1] * order for order in self.orders]
-        digital_VMC = [self.cost['Printing']["Digital"][1] * digital_order for digital_order in self.digital_orders]
-        offshore_VMC = [self.cost['Printing']["Offshore"][1] * offshore_order for offshore_order in self.offshore_orders]
+        VMCs = [[self.cost['Printing'][tt][1] * o for o in order_dict[tt]]
+            for tt in self.technology_types]
 
-        sum_VMC = sum(POD_VMC + conv_VMC + digital_VMC + offshore_VMC)
+        POD_VMC, digital_VMC, conv_VMC, offshore_VMC = VMCs[0], VMCs[1], VMCs[2], VMCs[3]
+
+        sum_VMC = sum(map(sum, VMCs))
 
         # def VMC_cost(order_type):
         #     [...]
@@ -266,9 +266,10 @@ class Purchase_Plan(object):
 
         # sum_VMC = sum(map(VMC_cost, order_type))
 
-        sum_orders = sum(self.orders + self.POD_orders + self.digital_orders + self.offshore_orders)
+        sum_orders = sum(map(sum, order_dict.values()))
 
         umc = (sum_FMC + sum_VMC) / sum_orders # approximation - should be a list
+        
         carry_stg_cost = [float(self.cost['WACC']) / 12 * month_avg * umc for month_avg in self.average_inventory]
 
         if self.SS_as_POD_flag == False:
@@ -276,9 +277,10 @@ class Purchase_Plan(object):
         else:
             loss = self.cost['Printing']["POD"][1]
 
-        lost_sales_expected = [loss*int(self.calc_expected_lost_sales(inv+ret+order+POD_order+digital_order+offshore_order, dem, sd)) 
-                               for inv, ret, order, POD_order, digital_order, offshore_order, dem, sd in 
-                               zip(self.starting_inventory, self.returns, self.orders, self.POD_orders, self.digital_orders, self.offshore_orders, self.forecast, self.sd_forecast)]
+        lost_sales_expected = [loss*int(self.calc_expected_lost_sales(inv+ret+POD_order+digital_order+conv_order+offshore_order, dem, sd)) 
+                                for inv, ret, POD_order, digital_order, conv_order, offshore_order, dem, sd in 
+                                    zip(self.starting_inventory, self.returns, self.POD_orders, self.digital_orders, 
+                                        self.orders, self.offshore_orders, self.forecast, self.sd_forecast)]
 
         return POD_FMC, conv_FMC, digital_FMC, offshore_FMC, POD_VMC, conv_VMC, digital_VMC, offshore_VMC, umc, carry_stg_cost, lost_sales_expected
 
@@ -443,7 +445,8 @@ if __name__ == '__main__':
     print "------------------- Unit tests -------------------"
     
     cost = {'perOrder': 80.0, 'WACC': 0.12, 'POD_vmc': 5.0, 'fmc': 1000, 
-        'vmc': 2.0, 'lost_margin': 10.00, 'allow_POD':True, "Printing": {"POD": (0, 4.7), "Digital": (100, 1.43), "Conventional": (1625, 1.00),
+        'vmc': 2.0, 'lost_margin': 10.00, 'allow_POD':True, "Printing": {"POD": (0, 4.7), 
+        "Digital": (100, 1.43), "Conventional": (1625, 1.00),
         "Offshore":(2000, 1.50)}}
 
 
