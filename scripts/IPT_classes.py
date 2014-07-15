@@ -135,7 +135,7 @@ class Purchase_Plan(object):
         self.inv_0 = inv_0
 
         self.technology_types = ['POD', 'Digital', 'Conventional', 'Offshore']
-        self.order_types = ['POD_orders', 'digital_orders', 'orders', 'offshore_orders']
+        #self.order_types = ['POD_orders', 'digital_orders', 'orders', 'offshore_orders']
 
         self.POD_orders, self.digital_orders, self.orders, self.offshore_orders, self.starting_inventory, \
                 self.ending_inventory, self.average_inventory, = self.determine_plan()
@@ -186,6 +186,15 @@ class Purchase_Plan(object):
 
         return orders
 
+    def calc_reorder_point(self):
+        #  current period i
+        #  forecast (i)
+        #  period of last printing j
+        #  cv for (i-j) periods
+        #  target service level
+        #  look for other instances of sd_forecast (lost sales calculation!)
+        pass
+
 
     def determine_plan(self):
         # pass stuff in to functions explicitly; don't use global variables
@@ -210,7 +219,7 @@ class Purchase_Plan(object):
             # calculate trial ending inventory
             trial_ending_inventory = start_inv[i] - fcst + self.returns[i]
             # if trial ending inventory < ROP, place order
-            if trial_ending_inventory < self.reorder_point[i]:
+            if trial_ending_inventory < self.reorder_point[i]:  # replace with "get reorder point function"
                 # determine order quantity
                 POD_orders[i], digital_orders[i], orders[i], offshore_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
 
