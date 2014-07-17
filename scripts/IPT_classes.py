@@ -51,12 +51,12 @@ class Demand_Plan(object):
 
     def calc_sd_forecast(self):
         '''Returns a list with forecast standard deviation.  It is calculated
-        based on a starting coefficient of variation with an incremental cv for 
-        every successive month in the future.'''
+        based on a coefficient of variation function. This presumes that a forecast has been
+        generated within a month of a reorder being placed.'''
 
         month, forecast = self.calc_forecast()
 
-        sd_forecast = [int((self.initial_cv + i*self.per_period_cv) * monthly_forecast) for i, monthly_forecast in enumerate(forecast)]
+        sd_forecast = [int(self.initial_cv * monthly_forecast) for monthly_forecast in forecast]
 
         return sd_forecast
 
@@ -187,10 +187,11 @@ class Purchase_Plan(object):
         return orders
 
     def calc_reorder_point(self):
-        #  current period i
-        #  forecast (i)
-        #  period of last printing j
-        #  cv for (i-j) periods
+        '''Calculate the inventory level at which you would generate a replenishment.
+        It is based on service level x variance in demand over the lead time + expected demand over lead time'''
+        #  calculate the reorder point every period
+        #  calculate the variance over the lead time (lead time is a parameter)
+        #  use the forecast at 1, 2, 3 periods out from i depending on lead time w cv periods
         #  target service level
         #  look for other instances of sd_forecast (lost sales calculation!)
         pass
@@ -233,7 +234,7 @@ class Purchase_Plan(object):
         return POD_orders, digital_orders, orders, offshore_orders, start_inv, end_inv, avg_inv, 
 
     def calc_expected_lost_sales(self, inventory, mean_demand, std_dev_demand):
-        '''Utilizes loss function to calculate lost sales'''
+        '''Utilizes loss function to calculate lost sales.'''
         shortfall = integrate.quad(lambda x: (x-inventory)*stats.norm.pdf(x, loc=mean_demand, 
                                 scale=std_dev_demand), inventory, np.inf)[0]
         return shortfall
@@ -285,6 +286,9 @@ class Purchase_Plan(object):
         else:
             loss = self.cost['Printing']["POD"][1]
 
+
+        # the following needs to be updated to feed the correct expected demand over a replenishment lead time 
+        # and accumulated variance.
         lost_sales_expected = [loss*int(self.calc_expected_lost_sales(inv+ret+POD_order+digital_order+conv_order+offshore_order, dem, sd)) 
                                 for inv, ret, POD_order, digital_order, conv_order, offshore_order, dem, sd in 
                                     zip(starting_inventory, returns, agg_orders["POD"], agg_orders["Digital"], 
@@ -369,12 +373,43 @@ class SS_Plan(object):
         # develop plan with ROPs loaded
 
     def calc_reorder_points(self):
+        '''While this is labeled calc_reorder_points, it actually calculates safety stock.  
+        It takes the accumulated variance in demand over the replenshment lead time 
+        x a service multiplier.  It can be enhanced to reflect variance in the
+        lead time itself, but does not currently do that.
+
+        Reorder points would just be the demand over the lead time plus the safety stock.  
+        Instead we're calculating the safety stock at the point when the order 
+        would normally have been placed and moving it out to when the replenshment should have come in.
+        Investment-wise, only the safety stock matters and we can assume that the stock would have been 
+        ordered to come in when needed.
+
+        This works out to be the safety stock based on the previous months corresponding to the
+        replenishment interval.  It is calculated using principle that variance of a sum of RVs is 
+        equal to the sum of the variance of the RVs: 
+
+        Note that SS(0) = 0.
+        if i < r, then just use the variances for the months for which we have forecasts.
+
+        If r = 2.5, then we use:
+        var period i: (0.5 * sd_forecast(i))**2
+        var period i-1: (sd_forecast(i-1)**2
+        var period i-2: (sd_forecast(i-2)**2
+        sd of r = (sum(variances)(**0.5 '''
+
+        '''(forecast, sd_forecast, target_service_level, replen_lead_time) --> ROP list'''
+
+        def lead_time_sd():
+            number_periods = int(replen_lead_time)
+            fract_period = replen_lead_time - number_periods
+            for i in range(number_periods): 
         # ROP = replen_lead_time * fcst + 1.96 *(replen_lead_time*sd**2)**0.5
 
         service_multiplier = stats.norm.ppf(self.target_service_level, loc=0, scale=1)
 
-        #reorder_point = [int(replen_lead_time*fcst +service_multiplier*(replen_lead_time*sd**2)**0.5) 
-        #                 for fcst, sd in zip(forecast,sd_forecast)]
+        SDs = [lead_time_sd(x,y,z) for i, fcst, sd in eumerate(zip(forecast, sd_forecast))]
+
+        # this needs to be enhanced to accumulate demand variances over the replenishment lead time.  
         reorder_point = [int(service_multiplier*(self.replen_lead_time)**2*sd) for sd in self.sd_forecast]
 
         return reorder_point
