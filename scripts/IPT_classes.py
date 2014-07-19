@@ -186,16 +186,6 @@ class Purchase_Plan(object):
 
         return orders
 
-    def calc_reorder_point(self):
-        '''Calculate the inventory level at which you would generate a replenishment.
-        It is based on service level x variance in demand over the lead time + expected demand over lead time'''
-        #  calculate the reorder point every period
-        #  calculate the variance over the lead time (lead time is a parameter)
-        #  use the forecast at 1, 2, 3 periods out from i depending on lead time w cv periods
-        #  target service level
-        #  look for other instances of sd_forecast (lost sales calculation!)
-        pass
-
 
     def determine_plan(self):
         # pass stuff in to functions explicitly; don't use global variables
@@ -389,8 +379,8 @@ class SS_Plan(object):
             result = []
             fract_period = r % 1
             number_periods = round_up(r)
-            for j in range(max(0,int(i-r+1), i+1)):
-                horizon = j-i+number_periods
+            for j in range(max(0,i-number_periods+1), i+1):
+                horizon = i-j
                 if fract_period and j == i:
                     result += [(fract_period * forecast[j]*(initial_cv + per_period_cv * horizon))**2]
                 else:
@@ -434,9 +424,9 @@ class SS_Plan(object):
         SDs = self.calc_leadtime_sd(replen_lead_time, forecast, initial_cv, per_period_cv)
 
         # this needs to be enhanced to accumulate demand variances over the replenishment lead time.  
-        reorder_point = [int(service_multiplier*sd) for sd in SDs]
+        reorder_points = [int(service_multiplier*sd) for sd in SDs]
 
-        return reorder_point
+        return reorder_points
 
 class SS_Plan_None(SS_Plan):
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
@@ -573,13 +563,25 @@ if __name__ == '__main__':
     print "object print_plan_1:", print_plan_1
 
     print  "\n------------- test class SS_Plan -------------"
+
+    starting_monthly_demand = 100
+    number_months = 36
+    trendPerMonth = 0
+    seasonCoeffs = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+    #seasonCoeffs = [0.959482026,0.692569699,0.487806875,0.543161208,0.848077745,0.936798779,1.596854431,1.618086981,1.433374588,0.949500605,0.828435702,1.105851362]
+    initial_cv = 1
+    per_period_cv = 0
+
+    demand_plan_1 = Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
     
     replen_lead_time = 2
     target_service_level = 0.99
 
     ss_plan_1 = SS_Plan(xyz, demand_plan_1, target_service_level, replen_lead_time)
-    # print "object ss_plan_1:", ss_plan_1
-    # print "object ss_plan_1 reorder points:", ss_plan_1.reorder_point
+    #print "object ss_plan_1:", ss_plan_1
+    print "forecast:", demand_plan_1.forecast
+    print "SDs:", ss_plan_1.calc_leadtime_sd(2, demand_plan_1.forecast, initial_cv, per_period_cv)
+    print "object ss_plan_1 reorder points:", ss_plan_1.reorder_point
 
 
     print  "\n------------- test class Purchase_Plan -------------"
@@ -603,12 +605,14 @@ if __name__ == '__main__':
 
     purchase_plan_1 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1)
     purchase_plan_2 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_2)
-    # print "object purchase_plan_1:", purchase_plan_1
-    # print "object purchase_plan_1 POD breakeven:", purchase_plan_1.POD_breakeven
+    
+    print "\nPurchase plan without safety stock"
+    print "-------------------------------"
     print "Conv. orders, no ss:", purchase_plan_1.orders, sum(purchase_plan_1.orders)
     print "Digital orders, no ss:", purchase_plan_1.digital_orders, sum(purchase_plan_1.digital_orders)
     print "POD orders, no ss:", purchase_plan_1.POD_orders, sum(purchase_plan_1.POD_orders)
     print "Offshore orders, no ss:", purchase_plan_1.offshore_orders, sum(purchase_plan_1.offshore_orders)
+    print "Ending Inventory:", purchase_plan_1.ending_inventory
     print "Total cost:", purchase_plan_1.total_cost
     #
     print "\nPurchase plan with safety stock"
@@ -618,6 +622,7 @@ if __name__ == '__main__':
     print "Returns", returns_plan_1.returns
     print "Reorder Points", ss_plan_2.reorder_point
     print "Starting Inventory:", purchase_plan_2.starting_inventory
+    print "Ending Inventory:", purchase_plan_2.ending_inventory
     print "Conv. orders w ss", purchase_plan_2.orders, sum(purchase_plan_2.orders)
     print "Digital orders, w ss:", purchase_plan_2.digital_orders, sum(purchase_plan_2.digital_orders)
     print "POD orders, w ss:", purchase_plan_2.POD_orders, sum(purchase_plan_2.POD_orders)

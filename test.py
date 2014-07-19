@@ -18,18 +18,18 @@ def calc_leadtime_sd(r, i, sd, result = []):  # pass original i along in functio
 			r = number_periods + 1
 		else:
 			result = result + [sd[i]]
-		print r, i, result
+		#print r, i, result
 		return calc_leadtime_sd(r-1, i-1, sd, result)
 
-print calc_leadtime_sd(2.5, 4, sd)
+#print calc_leadtime_sd(2.5, 4, sd)
 
-print sd
+#print sd
 
 print "-------------------"
 
 round_up = lambda num: int(int(num + 1) if int(num) != num else int(num))
 
-def calc_leadtime_sd_iter(r, forecast, initial_cv, per_period_cv): 
+def calc_leadtime_sd(r, forecast, initial_cv, per_period_cv): 
 	''' Calculates the cumulative standard deviation of a forecast made r periods ago,
 	where r is the replenishment lead time.
 
@@ -42,20 +42,20 @@ def calc_leadtime_sd_iter(r, forecast, initial_cv, per_period_cv):
 		result = []
 		fract_period = r % 1
 		number_periods = round_up(r)
-		for j in range(max(0,int(i-r+1), i+1)):
-			horizon = j-i+number_periods
+		for j in range(max(0,i-number_periods+1), i+1):
+			horizon = i-j
+			print "i, j, horizon:", i, j, horizon
 			if fract_period and j == i:
 				result += [(fract_period * forecast[j]*(initial_cv + per_period_cv * horizon))**2]
 			else:
 		 		result += [(forecast[j]*(initial_cv + per_period_cv * horizon))**2]
-		 	#print j, horizon, forecast[j], result
+		 	print result
 			period_sd = sum(result)**0.5
 		replen_sds += [period_sd]
 	return replen_sds
 
 
-for r in [0, 1, 2, 3]:
-	print calc_leadtime_sd_iter(r, forecast, .15, 0.015)
+print calc_leadtime_sd(1.5, forecast, 1, 0)
 
 
 #  now fix the index overruns!
