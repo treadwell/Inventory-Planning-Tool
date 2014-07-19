@@ -51,12 +51,12 @@ class Demand_Plan(object):
 
     def calc_sd_forecast(self):
         '''Returns a list with forecast standard deviation.  It is calculated
-        based on a starting coefficient of variation with an incremental cv for 
-        every successive month in the future.'''
+        based on a coefficient of variation function. This presumes that a forecast has been
+        generated within a month of a reorder being placed.'''
 
         month, forecast = self.calc_forecast()
 
-        sd_forecast = [int((self.initial_cv + i*self.per_period_cv) * monthly_forecast) for i, monthly_forecast in enumerate(forecast)]
+        sd_forecast = [int(self.initial_cv * monthly_forecast) for monthly_forecast in forecast]
 
         return sd_forecast
 
@@ -135,7 +135,7 @@ class Purchase_Plan(object):
         self.inv_0 = inv_0
 
         self.technology_types = ['POD', 'Digital', 'Conventional', 'Offshore']
-        self.order_types = ['POD_orders', 'digital_orders', 'orders', 'offshore_orders']
+        #self.order_types = ['POD_orders', 'digital_orders', 'orders', 'offshore_orders']
 
         self.POD_orders, self.digital_orders, self.orders, self.offshore_orders, self.starting_inventory, \
                 self.ending_inventory, self.average_inventory, = self.determine_plan()
@@ -210,7 +210,7 @@ class Purchase_Plan(object):
             # calculate trial ending inventory
             trial_ending_inventory = start_inv[i] - fcst + self.returns[i]
             # if trial ending inventory < ROP, place order
-            if trial_ending_inventory < self.reorder_point[i]:
+            if trial_ending_inventory < self.reorder_point[i]:  # replace with "get reorder point function"
                 # determine order quantity
                 POD_orders[i], digital_orders[i], orders[i], offshore_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
 
@@ -224,7 +224,7 @@ class Purchase_Plan(object):
         return POD_orders, digital_orders, orders, offshore_orders, start_inv, end_inv, avg_inv, 
 
     def calc_expected_lost_sales(self, inventory, mean_demand, std_dev_demand):
-        '''Utilizes loss function to calculate lost sales'''
+        '''Utilizes loss function to calculate lost sales.'''
         shortfall = integrate.quad(lambda x: (x-inventory)*stats.norm.pdf(x, loc=mean_demand, 
                                 scale=std_dev_demand), inventory, np.inf)[0]
         return shortfall
@@ -276,6 +276,9 @@ class Purchase_Plan(object):
         else:
             loss = self.cost['Printing']["POD"][1]
 
+
+        # the following needs to be updated to feed the correct expected demand over a replenishment lead time 
+        # and accumulated variance.
         lost_sales_expected = [loss*int(self.calc_expected_lost_sales(inv+ret+POD_order+digital_order+conv_order+offshore_order, dem, sd)) 
                                 for inv, ret, POD_order, digital_order, conv_order, offshore_order, dem, sd in 
                                     zip(starting_inventory, returns, agg_orders["POD"], agg_orders["Digital"], 
@@ -348,27 +351,82 @@ class SS_Plan(object):
     
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
         self.title_name = title.title_name
-        self.sd_forecast = demand_plan.sd_forecast
+        self.demand_plan = demand_plan
         self.target_service_level = target_service_level
         self.replen_lead_time = replen_lead_time
-        self.reorder_point = self.calc_reorder_points()
+        self.reorder_point = self.calc_reorder_points(target_service_level, replen_lead_time, self.demand_plan.forecast, initial_cv, per_period_cv)
         self.SS_as_POD_flag = False
 
     def __repr__(self):
         return str(self.__dict__)
 
-        # develop plan with ROPs loaded
+    
 
-    def calc_reorder_points(self):
+    def calc_leadtime_sd(self, r, forecast, initial_cv, per_period_cv): 
+        ''' Calculates the cumulative standard deviation of a forecast made r periods ago,
+        where r is the replenishment lead time.
+
+        if i = 5 and r = 3, forecast was generated in period 1
+        forecast for i = 5, horizon = 3
+        forecast for i = 4, horizon = 2
+        forecast for i = 2, horizon = 1'''
+
+        def round_up(x):
+            return int(int(x + 1) if int(x) != x else int(x))
+
+        replen_sds = []
+        for i, f in enumerate(forecast):
+            result = []
+            fract_period = r % 1
+            number_periods = round_up(r)
+            for j in range(max(0,i-number_periods+1), i+1):
+                horizon = i-j
+                if fract_period and j == i:
+                    result += [(fract_period * forecast[j]*(initial_cv + per_period_cv * horizon))**2]
+                else:
+                    result += [(forecast[j]*(initial_cv + per_period_cv * horizon))**2]
+                #print j, horizon, forecast[j], result
+                period_sd = sum(result)**0.5
+            replen_sds += [period_sd]
+        return replen_sds
+
+    def calc_reorder_points(self, target_service_level, replen_lead_time, forecast, initial_cv, per_period_cv):
+        '''While this is labeled calc_reorder_points, it actually calculates safety stock.  
+        It takes the accumulated variance in demand over the replenshment lead time 
+        x a service multiplier.  It can be enhanced to reflect variance in the
+        lead time itself, but does not currently do that.
+
+        Reorder points would just be the demand over the lead time plus the safety stock.  
+        Instead we're calculating the safety stock at the point when the order 
+        would normally have been placed and moving it out to when the replenshment should have come in.
+        Investment-wise, only the safety stock matters and we can assume that the stock would have been 
+        ordered to come in when needed.
+
+        This works out to be the safety stock based on the previous months corresponding to the
+        replenishment interval.  It is calculated using principle that variance of a sum of RVs is 
+        equal to the sum of the variance of the RVs: 
+
+        Note that SS(0) = 0.
+        if i < r, then just use the variances for the months for which we have forecasts.
+
+        If r = 2.5, then we use:
+        var period i: (0.5 * sd_forecast(i))**2
+        var period i-1: (sd_forecast(i-1)**2
+        var period i-2: (sd_forecast(i-2)**2
+        sd of r = (sum(variances)(**0.5 '''
+
+        '''(target_service_level, replen_lead_time, forecast, initial_cv, per_period_cv) --> ROP list'''
+
         # ROP = replen_lead_time * fcst + 1.96 *(replen_lead_time*sd**2)**0.5
 
-        service_multiplier = stats.norm.ppf(self.target_service_level, loc=0, scale=1)
+        service_multiplier = stats.norm.ppf(target_service_level, loc=0, scale=1)
 
-        #reorder_point = [int(replen_lead_time*fcst +service_multiplier*(replen_lead_time*sd**2)**0.5) 
-        #                 for fcst, sd in zip(forecast,sd_forecast)]
-        reorder_point = [int(service_multiplier*(self.replen_lead_time)**2*sd) for sd in self.sd_forecast]
+        SDs = self.calc_leadtime_sd(replen_lead_time, forecast, initial_cv, per_period_cv)
 
-        return reorder_point
+        # this needs to be enhanced to accumulate demand variances over the replenishment lead time.  
+        reorder_points = [int(service_multiplier*sd) for sd in SDs]
+
+        return reorder_points
 
 class SS_Plan_None(SS_Plan):
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
@@ -505,13 +563,25 @@ if __name__ == '__main__':
     print "object print_plan_1:", print_plan_1
 
     print  "\n------------- test class SS_Plan -------------"
+
+    starting_monthly_demand = 100
+    number_months = 36
+    trendPerMonth = 0
+    seasonCoeffs = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+    #seasonCoeffs = [0.959482026,0.692569699,0.487806875,0.543161208,0.848077745,0.936798779,1.596854431,1.618086981,1.433374588,0.949500605,0.828435702,1.105851362]
+    initial_cv = 1
+    per_period_cv = 0
+
+    demand_plan_1 = Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
     
     replen_lead_time = 2
     target_service_level = 0.99
 
     ss_plan_1 = SS_Plan(xyz, demand_plan_1, target_service_level, replen_lead_time)
-    # print "object ss_plan_1:", ss_plan_1
-    # print "object ss_plan_1 reorder points:", ss_plan_1.reorder_point
+    #print "object ss_plan_1:", ss_plan_1
+    print "forecast:", demand_plan_1.forecast
+    print "SDs:", ss_plan_1.calc_leadtime_sd(2, demand_plan_1.forecast, initial_cv, per_period_cv)
+    print "object ss_plan_1 reorder points:", ss_plan_1.reorder_point
 
 
     print  "\n------------- test class Purchase_Plan -------------"
@@ -535,12 +605,14 @@ if __name__ == '__main__':
 
     purchase_plan_1 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1)
     purchase_plan_2 = Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_2)
-    # print "object purchase_plan_1:", purchase_plan_1
-    # print "object purchase_plan_1 POD breakeven:", purchase_plan_1.POD_breakeven
+    
+    print "\nPurchase plan without safety stock"
+    print "-------------------------------"
     print "Conv. orders, no ss:", purchase_plan_1.orders, sum(purchase_plan_1.orders)
     print "Digital orders, no ss:", purchase_plan_1.digital_orders, sum(purchase_plan_1.digital_orders)
     print "POD orders, no ss:", purchase_plan_1.POD_orders, sum(purchase_plan_1.POD_orders)
     print "Offshore orders, no ss:", purchase_plan_1.offshore_orders, sum(purchase_plan_1.offshore_orders)
+    print "Ending Inventory:", purchase_plan_1.ending_inventory
     print "Total cost:", purchase_plan_1.total_cost
     #
     print "\nPurchase plan with safety stock"
@@ -550,6 +622,7 @@ if __name__ == '__main__':
     print "Returns", returns_plan_1.returns
     print "Reorder Points", ss_plan_2.reorder_point
     print "Starting Inventory:", purchase_plan_2.starting_inventory
+    print "Ending Inventory:", purchase_plan_2.ending_inventory
     print "Conv. orders w ss", purchase_plan_2.orders, sum(purchase_plan_2.orders)
     print "Digital orders, w ss:", purchase_plan_2.digital_orders, sum(purchase_plan_2.digital_orders)
     print "POD orders, w ss:", purchase_plan_2.POD_orders, sum(purchase_plan_2.POD_orders)
