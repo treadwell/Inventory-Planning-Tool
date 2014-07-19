@@ -1,6 +1,6 @@
 
 
-forecast = [1] * 10
+forecast = [100] * 10
 sd = [1, 2, 3, 4, 5, 6, 7, 8]
 
 initial_cv = 0.15
@@ -29,7 +29,7 @@ print "-------------------"
 
 round_up = lambda num: int(int(num + 1) if int(num) != num else int(num))
 
-def calc_leadtime_sd_iter(r, i, sd): 
+def calc_leadtime_sd_iter(r, forecast, initial_cv, per_period_cv): 
 	''' Calculates the cumulative standard deviation of a forecast made r periods ago,
 	where r is the replenishment lead time.
 
@@ -37,19 +37,26 @@ def calc_leadtime_sd_iter(r, i, sd):
 	forecast for i = 5, horizon = 3
 	forecast for i = 4, horizon = 2
 	forecast for i = 2, horizon = 1'''
-	result = []
-	fract_period = r % 1
-	number_periods = round_up(r)
-	for j in range(int(i-r+1), i+1):
-		horizon = j-i+number_periods
-		if fract_period and j == i:
-			result += [fract_period * sd[j]]
-		else:
-	 		result += [sd[j]]
-	 	print j, horizon, sd[j], result
-	return sum(result)
+	replen_sds = []
+	for i, f in enumerate(forecast):
+		result = []
+		fract_period = r % 1
+		number_periods = round_up(r)
+		for j in range(max(0,int(i-r+1), i+1)):
+			horizon = j-i+number_periods
+			if fract_period and j == i:
+				result += [(fract_period * forecast[j]*(initial_cv + per_period_cv * horizon))**2]
+			else:
+		 		result += [(forecast[j]*(initial_cv + per_period_cv * horizon))**2]
+		 	#print j, horizon, forecast[j], result
+			period_sd = sum(result)**0.5
+		replen_sds += [period_sd]
+	return replen_sds
 
-print calc_leadtime_sd_iter(2.5, 5, sd)
+
+for r in [0, 1, 2, 3]:
+	print calc_leadtime_sd_iter(r, forecast, .15, 0.015)
+
+
 #  now fix the index overruns!
-# reverse the partial r
-# use the cv++ approach versus sd - longer forecasts.
+#  return a list of SDs

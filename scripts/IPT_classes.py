@@ -361,18 +361,46 @@ class SS_Plan(object):
     
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
         self.title_name = title.title_name
-        self.sd_forecast = demand_plan.sd_forecast
+        self.demand_plan = demand_plan
         self.target_service_level = target_service_level
         self.replen_lead_time = replen_lead_time
-        self.reorder_point = self.calc_reorder_points()
+        self.reorder_point = self.calc_reorder_points(target_service_level, replen_lead_time, self.demand_plan.forecast, initial_cv, per_period_cv)
         self.SS_as_POD_flag = False
 
     def __repr__(self):
         return str(self.__dict__)
 
-        # develop plan with ROPs loaded
+    
 
-    def calc_reorder_points(self):
+    def calc_leadtime_sd(self, r, forecast, initial_cv, per_period_cv): 
+        ''' Calculates the cumulative standard deviation of a forecast made r periods ago,
+        where r is the replenishment lead time.
+
+        if i = 5 and r = 3, forecast was generated in period 1
+        forecast for i = 5, horizon = 3
+        forecast for i = 4, horizon = 2
+        forecast for i = 2, horizon = 1'''
+
+        def round_up(x):
+            return int(int(x + 1) if int(x) != x else int(x))
+
+        replen_sds = []
+        for i, f in enumerate(forecast):
+            result = []
+            fract_period = r % 1
+            number_periods = round_up(r)
+            for j in range(max(0,int(i-r+1), i+1)):
+                horizon = j-i+number_periods
+                if fract_period and j == i:
+                    result += [(fract_period * forecast[j]*(initial_cv + per_period_cv * horizon))**2]
+                else:
+                    result += [(forecast[j]*(initial_cv + per_period_cv * horizon))**2]
+                #print j, horizon, forecast[j], result
+                period_sd = sum(result)**0.5
+            replen_sds += [period_sd]
+        return replen_sds
+
+    def calc_reorder_points(self, target_service_level, replen_lead_time, forecast, initial_cv, per_period_cv):
         '''While this is labeled calc_reorder_points, it actually calculates safety stock.  
         It takes the accumulated variance in demand over the replenshment lead time 
         x a service multiplier.  It can be enhanced to reflect variance in the
@@ -397,20 +425,16 @@ class SS_Plan(object):
         var period i-2: (sd_forecast(i-2)**2
         sd of r = (sum(variances)(**0.5 '''
 
-        '''(forecast, sd_forecast, target_service_level, replen_lead_time) --> ROP list'''
+        '''(target_service_level, replen_lead_time, forecast, initial_cv, per_period_cv) --> ROP list'''
 
-        def lead_time_sd():
-            number_periods = int(replen_lead_time)
-            fract_period = replen_lead_time - number_periods
-            for i in range(number_periods): 
         # ROP = replen_lead_time * fcst + 1.96 *(replen_lead_time*sd**2)**0.5
 
-        service_multiplier = stats.norm.ppf(self.target_service_level, loc=0, scale=1)
+        service_multiplier = stats.norm.ppf(target_service_level, loc=0, scale=1)
 
-        SDs = [lead_time_sd(x,y,z) for i, fcst, sd in eumerate(zip(forecast, sd_forecast))]
+        SDs = self.calc_leadtime_sd(replen_lead_time, forecast, initial_cv, per_period_cv)
 
         # this needs to be enhanced to accumulate demand variances over the replenishment lead time.  
-        reorder_point = [int(service_multiplier*(self.replen_lead_time)**2*sd) for sd in self.sd_forecast]
+        reorder_point = [int(service_multiplier*sd) for sd in SDs]
 
         return reorder_point
 
