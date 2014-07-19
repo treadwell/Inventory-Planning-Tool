@@ -121,11 +121,13 @@ class Purchase_Plan(object):
         self.title_name = title.title_name
         self.cost = title.cost
         self.demand_plan = demand_plan
+        self.returns_plan = returns_plan
+        self.ss_plan = ss_plan
         # reference months, forecast, etc. on the fly/as needed 
         ## months = self.demand_plan.months
         self.months = demand_plan.months
         self.forecast = demand_plan.forecast
-        self.sd_forecast = demand_plan.sd_forecast
+        #self.sd_forecast = demand_plan.sd_forecast
         self.returns = returns_plan.returns
         self.POD_breakeven = self.calc_POD_breakeven()
         self.order_n_months_supply = order_n_months_supply
@@ -137,11 +139,12 @@ class Purchase_Plan(object):
         #self.order_types = ['POD_orders', 'digital_orders', 'orders', 'offshore_orders']
 
         self.POD_orders, self.digital_orders, self.orders, self.offshore_orders, self.starting_inventory, \
-                self.ending_inventory, self.average_inventory, = self.determine_plan()
+                self.ending_inventory, self.average_inventory, = self.determine_plan(self.demand_plan.forecast, \
+                    self.returns_plan.returns, self.ss_plan.reorder_point, self.inv_0)
 
         self.POD_FMC, self.digital_FMC, self.conv_FMC, self.offshore_FMC, self.POD_VMC,  \
                 self.digital_VMC, self.conv_VMC, self.offshore_VMC, self.umc, \
-                self.carry_stg_cost, self.lost_sales_expected = self.calc_costs(self.forecast, self.sd_forecast, self.returns, 
+                self.carry_stg_cost, self.lost_sales_expected = self.calc_costs(self.demand_plan.forecast, self.demand_plan.sd_forecast, self.returns, 
                     self.POD_orders, self.digital_orders, self.orders, self.offshore_orders, self.starting_inventory, self.average_inventory,)
 
         #self.POD_FMC = self.calc_costs()[0]
@@ -186,35 +189,31 @@ class Purchase_Plan(object):
         return orders
 
 
-    def determine_plan(self):
+    def determine_plan(self, forecast, returns, reorder_point, inv_0):
         # pass stuff in to functions explicitly; don't use global variables
         # within the class
-        if self.reorder_point == None:
-            self.reorder_point = [0] * len(self.months)
+        # if self.reorder_point == None:
+        #     self.reorder_point = [0] * len(self.months)
 
-        starting_inventory = []
-        ending_inventory = []
-        average_inventory = []
-        start_inv, avg_inv, end_inv = [], [], []
 
-        horizon = len(self.forecast)
+        start_inv, avg_inv, end_inv = [inv_0], [], []
+
+        horizon = len(forecast)
         POD_orders, orders, digital_orders, offshore_orders = [0]*horizon, [0]*horizon, [0]*horizon, [0]*horizon
 
-        for i, fcst in enumerate(self.forecast):
+        for i, fcst in enumerate(forecast):
             # calculate starting inventory
-            if i == 0:
-                start_inv.append(self.inv_0)
-            else:
+            if i > 0:
                 start_inv.append(end_inv[i-1])
             # calculate trial ending inventory
-            trial_ending_inventory = start_inv[i] - fcst + self.returns[i]
+            trial_ending_inventory = start_inv[i] - fcst + returns[i]
             # if trial ending inventory < ROP, place order
-            if trial_ending_inventory < self.reorder_point[i]:  # replace with "get reorder point function"
+            if trial_ending_inventory < reorder_point[i]:  # replace with "get reorder point function"
                 # determine order quantity
-                POD_orders[i], digital_orders[i], orders[i], offshore_orders[i] = self.calc_order_qty(i, self.forecast, self.returns)
+                POD_orders[i], digital_orders[i], orders[i], offshore_orders[i] = self.calc_order_qty(i, forecast, returns)
 
             # calculate ending inventory from inventory balance equation
-            end_inv.append(start_inv[i] - self.forecast[i] + self.returns[i]
+            end_inv.append(start_inv[i] - forecast[i] + returns[i]
                                         + orders[i] + POD_orders[i] + digital_orders[i] + offshore_orders[i])
 
             # calculate average inventory in order to calculate period carrying cost
@@ -429,12 +428,14 @@ class SS_Plan(object):
 
 class SS_Plan_None(SS_Plan):
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
-        self.reorder_point = None
+        self.demand_plan = demand_plan
+        self.reorder_point = [0] * len(self.demand_plan.forecast)
         self.SS_as_POD_flag = False
 
 class SS_Plan_POD(SS_Plan):
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
-        self.reorder_point = None
+        self.demand_plan = demand_plan
+        self.reorder_point = [0] * len(self.demand_plan.forecast)
         self.SS_as_POD_flag = True
 
 
