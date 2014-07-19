@@ -129,7 +129,7 @@ class Purchase_Plan(object):
         self.forecast = demand_plan.forecast
         #self.sd_forecast = demand_plan.sd_forecast
         self.returns = returns_plan.returns
-        self.POD_breakeven = self.calc_POD_breakeven()
+        #self.POD_breakeven = self.calc_POD_breakeven()
         self.order_n_months_supply = order_n_months_supply
         self.reorder_point = ss_plan.reorder_point
         self.SS_as_POD_flag = ss_plan.SS_as_POD_flag
@@ -158,12 +158,6 @@ class Purchase_Plan(object):
 
     def subclassable_fn(self):
         raise NotImplementedError # fn that's going to be implemented in a subclass
-
-    def calc_POD_breakeven(self):
-        # note that this should really incorporate WACC
-        return self.cost['fmc']/(self.cost['POD_vmc']-self.cost['vmc'])
-
-    
 
     def calc_order_qty(self, i, forecast, returns):
         # determine order quantity
@@ -349,10 +343,10 @@ class SS_Plan(object):
     
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
         self.title_name = title.title_name
-        self.demand_plan = demand_plan
+        self.d_plan = demand_plan
         self.target_service_level = target_service_level
         self.replen_lead_time = replen_lead_time
-        self.reorder_point = self.calc_reorder_points(target_service_level, replen_lead_time, self.demand_plan.forecast, self.demand_plan.initial_cv, self.demand_plan.per_period_cv)
+        self.reorder_point = self.calc_reorder_points(self.d_plan, target_service_level, replen_lead_time)
         self.SS_as_POD_flag = False
 
     def __repr__(self):
@@ -373,6 +367,8 @@ class SS_Plan(object):
             return int(int(x + 1) if int(x) != x else int(x))
 
         replen_sds = []
+        if r == 0:
+            return [0] * len(forecast)
         for i, f in enumerate(forecast):
             result = []
             fract_period = r % 1
@@ -388,7 +384,7 @@ class SS_Plan(object):
             replen_sds += [period_sd]
         return replen_sds
 
-    def calc_reorder_points(self, target_service_level, replen_lead_time, forecast, initial_cv, per_period_cv):
+    def calc_reorder_points(self, d_plan, target_service_level, replen_lead_time, ):
         '''While this is labeled calc_reorder_points, it actually calculates safety stock.  
         It takes the accumulated variance in demand over the replenshment lead time 
         x a service multiplier.  It can be enhanced to reflect variance in the
@@ -419,7 +415,7 @@ class SS_Plan(object):
 
         service_multiplier = stats.norm.ppf(target_service_level, loc=0, scale=1)
 
-        SDs = self.calc_leadtime_sd(replen_lead_time, forecast, initial_cv, per_period_cv)
+        SDs = self.calc_leadtime_sd(replen_lead_time, d_plan.forecast, d_plan.initial_cv, d_plan.per_period_cv)
 
         # this needs to be enhanced to accumulate demand variances over the replenishment lead time.  
         reorder_points = [int(service_multiplier*sd) for sd in SDs]
@@ -480,18 +476,6 @@ def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Pla
 
     return stats
 
-# ### in scenario.py:
-# for pp in plans.purchasing_plans:
-#     for ss in plans.ss_plans:
-#         for p in plans.print_plans:
-#             plans.Plan(title, pp, ss, p).generate_graphs() # or w/e the output is
-
-
-# ###
-
-
-
-# set path to working directory
 
 path = '/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/'
 
@@ -500,5 +484,16 @@ path = '/Users/kbrooks/Documents/MH/Projects/Inventory Planning Tool/'
 
 if __name__ == '__main__':
     print "------------------- Unit tests -------------------"
-    
+
+    cost = {'perOrder': 80.0, 'WACC': 0.12, 'lost_margin': 10.00, 'allow_POD':True, 
+        "Printing": {"POD": (0, 4.7), 
+                    "Digital": (100, 1.43), 
+                    "Conventional": (1625, 1.00),
+                    "Offshore":(2000, 1.50)}}
+
+    xyz = Title("xyz", cost)
+
+    print "Normal Demand:", scenario(xyz, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Plan)
+
+
 
