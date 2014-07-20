@@ -60,8 +60,8 @@ class Demand_Plan(object):
 
         return sd_forecast
 
-    def plot(self, title_name, months, forecast, outfile_name = "01_forecast.png", saveflag = True, showflag = True):
-        # plot forecast
+    def plot(self, title_name, months, forecast, outfile_name = "01_forecast.png", saveflag = True, showflag = False):
+        plt.close('all')  # close any open figures
         plt.plot(months, forecast, linewidth=2.0, label='demand forecast')
         plt.ylabel('Units')
         plt.xlabel('Month')
@@ -70,9 +70,9 @@ class Demand_Plan(object):
         plt.legend()
         if saveflag ==True:
             plt.savefig('./output/' + outfile_name, dpi=300)
-            plt.figure(1)
+            plt.figure(outfile_name)
         if showflag == True:
-            plt.show(1)        
+            plt.show(outfile_name)        
 
 class Aggressive_Demand_Plan(Demand_Plan):
      # self.starting_monthly_demand *= 2 # would return an error, there's no
@@ -115,6 +115,21 @@ class Returns_Plan(object):
             else:
                 returns[i] = int(returns_rate*forecast[i-lag])
         return returns
+
+    def plot(self, title_name, months, forecast, returns, outfile_name = "02_returns.png", saveflag = True, showflag = False):
+        plt.close('all')  # close any open figures
+        plt.plot(months, forecast, linewidth=2.0, label='demand forecast')
+        plt.plot(months, returns, linewidth=2.0, label='returns forecast')
+        plt.ylabel('Units')
+        plt.xlabel('Month')
+
+        plt.title(title_name + ' Forecasted Demand and Returns', y=1.05, weight = "bold")
+        plt.legend()
+        if saveflag ==True:
+            plt.savefig('./output/' + outfile_name, dpi=300)
+            plt.figure(outfile_name)
+        if showflag == True:
+            plt.show(outfile_name)   
 
 
 class Purchase_Plan(object):

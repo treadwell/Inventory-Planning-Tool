@@ -46,7 +46,7 @@ assert sum(IPT.Demand_Plan(xyz, 1000, 36, -.5, 12 * [1], 0, 0).forecast)  == 199
 
 assert sum(IPT.Demand_Plan(xyz, 1000, 36, 0, 12 * [1], .5, 1).sd_forecast) == 18000
 
-demand_plan_1.plot(xyz.title_name, demand_plan_1.months, demand_plan_1.forecast, outfile_name = "test_forecast.png", saveflag = True, showflag = False)  # this works
+demand_plan_1.plot(xyz.title_name, demand_plan_1.months, demand_plan_1.forecast, outfile_name = "test_forecast.png", saveflag = True, showflag = False)
 
 
 print "\n------------- test class Aggressive_Demand_Plan -------------"
@@ -93,8 +93,8 @@ assert sum(IPT.Returns_Plan(title_retns_test, d_plan_retns_test, 1, 0).returns) 
 assert sum(IPT.Returns_Plan(title_retns_test, d_plan_retns_test, 1, 36).returns) == 0
 assert sum(IPT.Returns_Plan(title_retns_test, d_plan_retns_test, 1, 48).returns) == 0
 
-#print "object returns_plan_1:", returns_plan_1
-# print "returns:", returns_plan_1.returns
+returns_plan_test.plot(xyz.title_name, d_plan_retns_test.months, d_plan_retns_test.forecast, returns_plan_test.returns, 
+	outfile_name = "test_returns.png", saveflag = True, showflag = False)
 
 print  "\n------------- test class Print_Plan -------------"
 
