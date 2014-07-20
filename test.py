@@ -44,6 +44,8 @@ assert sum(IPT.Demand_Plan(xyz, 1000, 36, 0, 12 * [1], 0, 0).forecast) == 36000
 assert sum(IPT.Demand_Plan(xyz, 1000, 36, -1, 12 * [1], 0, 0).forecast) == 1000
 assert sum(IPT.Demand_Plan(xyz, 1000, 36, -.5, 12 * [1], 0, 0).forecast)  == 1994
 
+assert sum(IPT.Demand_Plan(xyz, 1000, 36, 0, 12 * [1], .5, 1).sd_forecast) == 18000
+
 # demand_plan_1.plot()  # this works
 
 
@@ -124,65 +126,77 @@ assert "SDs:", ss_plan_1.calc_leadtime_sd(2.5, d_plan.forecast, 1, 0)[35] == (2 
 # test the multiplier
 # test the rops
 
-
-print "object ss_plan_1 reorder points:", ss_plan_1.reorder_point
-
-
-# print  "\n------------- test class Purchase_Plan -------------"
-
-# starting_monthly_demand = 1000
-# number_months = 36
-# trendPerMonth = -0.00
-# seasonCoeffs = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
-# #seasonCoeffs = [0.959482026,0.692569699,0.487806875,0.543161208,0.848077745,0.936798779,1.596854431,1.618086981,1.433374588,0.949500605,0.828435702,1.105851362]
-# initial_cv = 0.15
-# per_period_cv = 0.015
-
-# demand_plan_1 = IPT.Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
-
-# returns_rate = 0.0
-# lag = 3
-# returns_plan_1 = IPT.Returns_Plan(xyz, demand_plan_1, returns_rate, lag)
-
-# ss_plan_1 = IPT.SS_Plan_None(xyz, demand_plan_1, target_service_level, replen_lead_time)
-# ss_plan_2 = IPT.SS_Plan(xyz, demand_plan_1, target_service_level, replen_lead_time)
-
-# purchase_plan_1 = IPT.Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1)
-# purchase_plan_2 = IPT.Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_2)
-
-# print "\nPurchase plan without safety stock"
-# print "-------------------------------"
-# print "Conv. orders, no ss:", purchase_plan_1.orders, sum(purchase_plan_1.orders)
-# print "Digital orders, no ss:", purchase_plan_1.digital_orders, sum(purchase_plan_1.digital_orders)
-# print "POD orders, no ss:", purchase_plan_1.POD_orders, sum(purchase_plan_1.POD_orders)
-# print "Offshore orders, no ss:", purchase_plan_1.offshore_orders, sum(purchase_plan_1.offshore_orders)
-# print "Ending Inventory:", purchase_plan_1.ending_inventory
-# print "Total cost:", purchase_plan_1.total_cost
-# #
-# print "\nPurchase plan with safety stock"
-# print "-------------------------------"
-
-# print "Demand", demand_plan_1.forecast
-# print "Returns", returns_plan_1.returns
-# print "Reorder Points", ss_plan_2.reorder_point
-# print "Starting Inventory:", purchase_plan_2.starting_inventory
-# print "Ending Inventory:", purchase_plan_2.ending_inventory
-# print "Conv. orders w ss", purchase_plan_2.orders, sum(purchase_plan_2.orders)
-# print "Digital orders, w ss:", purchase_plan_2.digital_orders, sum(purchase_plan_2.digital_orders)
-# print "POD orders, w ss:", purchase_plan_2.POD_orders, sum(purchase_plan_2.POD_orders)
-# print "Offshore orders, w ss:", purchase_plan_2.offshore_orders, sum(purchase_plan_2.offshore_orders)
-# print "Total cost:", purchase_plan_2.total_cost
+#print "object ss_plan_1 calc reorder points:", ss_plan_1.calc_reorder_points(d_plan, target_service_level, replen_lead_time)
 
 
-# print  "\n------------- test scenario function -------------"
+assert "reorder points:", IPT.SS_Plan(title, d_plan, .99, 1).reorder_point[35] == 232
+assert "reorder points:", IPT.SS_Plan(title, d_plan, .99, 2).reorder_point[35] == 328
+assert "reorder points:", IPT.SS_Plan(title, d_plan, .99, 3).reorder_point[35]  == 402
 
-# print "Normal Demand:", IPT.scenario(xyz, IPT.Demand_Plan, IPT.Returns_Plan, IPT.Print_Plan, IPT.Purchase_Plan, IPT.SS_Plan)
-# print "Aggressive Demand:", IPT.scenario(xyz, IPT.Aggressive_Demand_Plan, IPT.Returns_Plan, IPT.Print_Plan, IPT.Purchase_Plan, IPT.SS_Plan)
-# print "Conservative Demand:", IPT.scenario(xyz, IPT.Conservative_Demand_Plan, IPT.Returns_Plan, IPT.Print_Plan, IPT.Purchase_Plan, IPT.SS_Plan)
+assert "\nreorder points:", IPT.SS_Plan(title, d_plan, .95, 1).reorder_point[35] == 164
+assert "reorder points:", IPT.SS_Plan(title, d_plan, .95, 2).reorder_point[35] == 232
+assert "reorder points:", IPT.SS_Plan(title, d_plan, .95, 3).reorder_point[35] == 284
 
-# print "\nCompare various safety stock and months supply scenarios"
-# for ss_scenario in [IPT.SS_Plan, IPT.SS_Plan_None, IPT.SS_Plan_POD]:
-#     print "\t", ss_scenario
-#     for i in [6, 9, 12, 18, 36]:
-#         print "\t\tTotal Cost for", i, "mo supply:", locale.currency(IPT.scenario(xyz, IPT.Demand_Plan, IPT.Returns_Plan, IPT.Print_Plan, 
-#                 IPT.Purchase_Plan, ss_scenario, i)['total cost'], grouping = True)
+assert "\nreorder points:", IPT.SS_Plan(title, d_plan, .50, 1).reorder_point[35] == 0
+assert "reorder points:", IPT.SS_Plan(title, d_plan, .50, 2).reorder_point[35] == 0
+assert "reorder points:", IPT.SS_Plan(title, d_plan, .50, 3).reorder_point[35]  == 0
+
+
+print  "\n------------- test class Purchase_Plan -------------"
+
+starting_monthly_demand = 1000
+number_months = 36
+trendPerMonth = -0.00
+seasonCoeffs = [1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+#seasonCoeffs = [0.959482026,0.692569699,0.487806875,0.543161208,0.848077745,0.936798779,1.596854431,1.618086981,1.433374588,0.949500605,0.828435702,1.105851362]
+initial_cv = 0.15
+per_period_cv = 0.015
+
+demand_plan_1 = IPT.Demand_Plan(xyz, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv)
+
+returns_rate = 0.0
+lag = 3
+returns_plan_1 = IPT.Returns_Plan(xyz, demand_plan_1, returns_rate, lag)
+
+ss_plan_1 = IPT.SS_Plan_None(xyz, demand_plan_1, target_service_level, replen_lead_time)
+ss_plan_2 = IPT.SS_Plan(xyz, demand_plan_1, target_service_level, replen_lead_time)
+
+purchase_plan_1 = IPT.Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_1)
+purchase_plan_2 = IPT.Purchase_Plan(xyz, demand_plan_1, returns_plan_1, print_plan_1, ss_plan_2)
+
+print "\nPurchase plan without safety stock"
+print "-------------------------------"
+print "Conv. orders, no ss:", purchase_plan_1.orders, sum(purchase_plan_1.orders)
+print "Digital orders, no ss:", purchase_plan_1.digital_orders, sum(purchase_plan_1.digital_orders)
+print "POD orders, no ss:", purchase_plan_1.POD_orders, sum(purchase_plan_1.POD_orders)
+print "Offshore orders, no ss:", purchase_plan_1.offshore_orders, sum(purchase_plan_1.offshore_orders)
+print "Ending Inventory:", purchase_plan_1.ending_inventory
+print "Total cost:", purchase_plan_1.total_cost
+#
+print "\nPurchase plan with safety stock"
+print "-------------------------------"
+
+print "Demand", demand_plan_1.forecast
+print "Returns", returns_plan_1.returns
+print "Reorder Points", ss_plan_2.reorder_point
+print "Starting Inventory:", purchase_plan_2.starting_inventory
+print "Ending Inventory:", purchase_plan_2.ending_inventory
+print "Conv. orders w ss", purchase_plan_2.orders, sum(purchase_plan_2.orders)
+print "Digital orders, w ss:", purchase_plan_2.digital_orders, sum(purchase_plan_2.digital_orders)
+print "POD orders, w ss:", purchase_plan_2.POD_orders, sum(purchase_plan_2.POD_orders)
+print "Offshore orders, w ss:", purchase_plan_2.offshore_orders, sum(purchase_plan_2.offshore_orders)
+print "Total cost:", purchase_plan_2.total_cost
+
+
+print  "\n------------- test scenario function -------------"
+
+print "Normal Demand:", IPT.scenario(xyz, IPT.Demand_Plan, IPT.Returns_Plan, IPT.Print_Plan, IPT.Purchase_Plan, IPT.SS_Plan)
+print "Aggressive Demand:", IPT.scenario(xyz, IPT.Aggressive_Demand_Plan, IPT.Returns_Plan, IPT.Print_Plan, IPT.Purchase_Plan, IPT.SS_Plan)
+print "Conservative Demand:", IPT.scenario(xyz, IPT.Conservative_Demand_Plan, IPT.Returns_Plan, IPT.Print_Plan, IPT.Purchase_Plan, IPT.SS_Plan)
+
+print "\nCompare various safety stock and months supply scenarios"
+for ss_scenario in [IPT.SS_Plan, IPT.SS_Plan_None, IPT.SS_Plan_POD]:
+    print "\t", ss_scenario
+    for i in [6, 9, 12, 18, 36]:
+        print "\t\tTotal Cost for", i, "mo supply:", locale.currency(IPT.scenario(xyz, IPT.Demand_Plan, IPT.Returns_Plan, IPT.Print_Plan, 
+                IPT.Purchase_Plan, ss_scenario, i)['total cost'], grouping = True)

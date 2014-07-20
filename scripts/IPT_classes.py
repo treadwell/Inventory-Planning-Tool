@@ -346,7 +346,7 @@ class SS_Plan(object):
         self.d_plan = demand_plan
         self.target_service_level = target_service_level
         self.replen_lead_time = replen_lead_time
-        self.reorder_point = self.calc_reorder_points(self.d_plan, target_service_level, replen_lead_time)
+        self.reorder_point = self.calc_reorder_points(self.d_plan, self.target_service_level, self.replen_lead_time)
         self.SS_as_POD_flag = False
 
     def __repr__(self):
@@ -384,7 +384,7 @@ class SS_Plan(object):
             replen_sds += [period_sd]
         return replen_sds
 
-    def calc_reorder_points(self, d_plan, target_service_level, replen_lead_time, ):
+    def calc_reorder_points(self, d_plan, target_service_level, replen_lead_time):
         '''While this is labeled calc_reorder_points, it actually calculates safety stock.  
         It takes the accumulated variance in demand over the replenshment lead time 
         x a service multiplier.  It can be enhanced to reflect variance in the
