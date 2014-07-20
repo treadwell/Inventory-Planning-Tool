@@ -7,8 +7,7 @@ Use cases
 4. Look at various actual instances of a plan to see what an actual demand pattern (or many demand patterns) might look like
 
 Backlog
-1. Recalculate ROPs whenever there is a printing <= critical
-	a. pull variances and ROPs into purchase_plan
+
 2. Implement an EOQ function (flag? subclass?)
 3. Reduce use of globals in classes
 4. implement print_plan classes

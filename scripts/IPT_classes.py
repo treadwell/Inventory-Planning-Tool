@@ -27,49 +27,52 @@ class Demand_Plan(object):
         self.seasonCoeffs = seasonCoeffs
         self.initial_cv = initial_cv
         self.per_period_cv = per_period_cv
-        self.months, self.forecast = self.calc_forecast()
-        self.sd_forecast = self.calc_sd_forecast()
+        self.months, self.forecast = self.calc_forecast(self.number_months, self.starting_monthly_demand, self.trendPerMonth, self.seasonCoeffs)
+        self.sd_forecast = self.calc_sd_forecast(self.forecast, self.initial_cv)
         
     def __repr__(self):
         return str(self.__dict__)
 
-    def calc_forecast(self):
+    def calc_forecast(self, number_months, starting_monthly_demand, trendPerMonth, seasonCoeffs):
         '''Returns two lists holding a sequential month number and a second with
         monthly forecasts based on level, trend and seasonality.  This is not 
         normalized to equal a particular liftetime sales target.'''
         
-        month = [i+1 for i in xrange(self.number_months)]
+        month = [i+1 for i in xrange(number_months)]
 
-        level = [self.starting_monthly_demand] * self.number_months
+        level = [starting_monthly_demand] * number_months
 
-        trend = [int(x * (1+self.trendPerMonth)**i) for i, x in enumerate(level)]
+        trend = [int(x * (1+trendPerMonth)**i) for i, x in enumerate(level)]
 
-        forecast = [int(x*self.seasonCoeffs[i % 12]) for i, x in enumerate(trend)]
+        forecast = [int(x*seasonCoeffs[i % 12]) for i, x in enumerate(trend)]
 
         return month, forecast
 
 
-    def calc_sd_forecast(self):
+    def calc_sd_forecast(self, forecast, initial_cv):
         '''Returns a list with forecast standard deviation.  It is calculated
         based on a coefficient of variation function. This presumes that a forecast has been
         generated within a month of a reorder being placed.'''
 
-        month, forecast = self.calc_forecast()
+        #month, forecast = self.calc_forecast()
 
-        sd_forecast = [int(self.initial_cv * monthly_forecast) for monthly_forecast in forecast]
+        sd_forecast = [int(initial_cv * monthly_forecast) for monthly_forecast in forecast]
 
         return sd_forecast
 
-    def plot(self):
+    def plot(self, title_name, months, forecast, outfile_name = "01_forecast.png", saveflag = True, showflag = True):
         # plot forecast
-        plt.plot(self.months,self.forecast, linewidth=2.0, label='demand forecast')
+        plt.plot(months, forecast, linewidth=2.0, label='demand forecast')
         plt.ylabel('Units')
         plt.xlabel('Month')
 
-        plt.title(self.title_name + ' Forecasted Demand', y=1.05, weight = "bold")
+        plt.title(title_name + ' Forecasted Demand', y=1.05, weight = "bold")
         plt.legend()
-        #plt.savefig('./output/' + '01_forecast.png',dpi=300)
-        plt.show(1)
+        if saveflag ==True:
+            plt.savefig('./output/' + outfile_name, dpi=300)
+            plt.figure(1)
+        if showflag == True:
+            plt.show(1)        
 
 class Aggressive_Demand_Plan(Demand_Plan):
      # self.starting_monthly_demand *= 2 # would return an error, there's no
@@ -80,15 +83,15 @@ class Aggressive_Demand_Plan(Demand_Plan):
         #Demand_Plan.__init__(self, *args) # also an option
         #super().__init__(self, *args) ## Python 3
         self.starting_monthly_demand *= 2
-        self.months, self.forecast = self.calc_forecast()
-        self.sd_forecast = self.calc_sd_forecast()
+        self.months, self.forecast = self.calc_forecast(self.number_months, self.starting_monthly_demand, self.trendPerMonth, self.seasonCoeffs)
+        self.sd_forecast = self.calc_sd_forecast(self.forecast, self.initial_cv)
 
 class Conservative_Demand_Plan(Demand_Plan):
     def __init__(self, *args):
         super(Conservative_Demand_Plan, self).__init__(*args)
         self.starting_monthly_demand /= 2.0
-        self.months, self.forecast = self.calc_forecast()
-        self.sd_forecast = self.calc_sd_forecast()
+        self.months, self.forecast = self.calc_forecast(self.number_months, self.starting_monthly_demand, self.trendPerMonth, self.seasonCoeffs)
+        self.sd_forecast = self.calc_sd_forecast(self.forecast, self.initial_cv)
 
 class Returns_Plan(object):
     def __init__(self, title, demand_plan, returns_rate, lag):

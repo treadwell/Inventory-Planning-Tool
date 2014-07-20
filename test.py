@@ -46,7 +46,7 @@ assert sum(IPT.Demand_Plan(xyz, 1000, 36, -.5, 12 * [1], 0, 0).forecast)  == 199
 
 assert sum(IPT.Demand_Plan(xyz, 1000, 36, 0, 12 * [1], .5, 1).sd_forecast) == 18000
 
-# demand_plan_1.plot()  # this works
+demand_plan_1.plot(xyz.title_name, demand_plan_1.months, demand_plan_1.forecast, outfile_name = "test_forecast.png", saveflag = True, showflag = False)  # this works
 
 
 print "\n------------- test class Aggressive_Demand_Plan -------------"
