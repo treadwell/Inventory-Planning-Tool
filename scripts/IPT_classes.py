@@ -20,7 +20,7 @@ class Title(object):
 
 class Demand_Plan(object):
     def __init__(self, title, starting_monthly_demand, number_months, trendPerMonth, seasonCoeffs, initial_cv, per_period_cv):
-        self.title_name = title.title_name
+        self.title = title
         self.starting_monthly_demand = starting_monthly_demand
         self.number_months = number_months
         self.trendPerMonth = trendPerMonth
@@ -136,23 +136,13 @@ class Purchase_Plan(object):
     """Base class for purchasing strategies"""
 
     def __init__(self, title, demand_plan, returns_plan, print_plan, ss_plan, order_n_months_supply = 9, inv_0 = 0):
-        self.title_name = title.title_name
-        self.cost = title.cost
+        self.title = title
         self.demand_plan = demand_plan
         self.returns_plan = returns_plan
         self.ss_plan = ss_plan
-        # reference months, forecast, etc. on the fly/as needed 
-        ## months = self.demand_plan.months
-        self.months = demand_plan.months
-        self.forecast = demand_plan.forecast
-        #self.sd_forecast = demand_plan.sd_forecast
-        self.returns = returns_plan.returns
-        #self.POD_breakeven = self.calc_POD_breakeven()
-        self.order_n_months_supply = order_n_months_supply
-        self.reorder_point = ss_plan.reorder_point
-        self.SS_as_POD_flag = ss_plan.SS_as_POD_flag
-        self.inv_0 = inv_0
 
+        self.order_n_months_supply = order_n_months_supply
+        self.inv_0 = inv_0
         self.technology_types = ['POD', 'Digital', 'Conventional', 'Offshore']
         #self.order_types = ['POD_orders', 'digital_orders', 'orders', 'offshore_orders']
 
@@ -162,8 +152,10 @@ class Purchase_Plan(object):
 
         self.POD_FMC, self.digital_FMC, self.conv_FMC, self.offshore_FMC, self.POD_VMC,  \
                 self.digital_VMC, self.conv_VMC, self.offshore_VMC, self.umc, \
-                self.carry_stg_cost, self.lost_sales_expected = self.calc_costs(self.demand_plan.forecast, self.demand_plan.sd_forecast, self.returns, 
-                    self.POD_orders, self.digital_orders, self.orders, self.offshore_orders, self.starting_inventory, self.average_inventory,)
+                self.carry_stg_cost, self.lost_sales_expected = \
+                    self.calc_costs(self.demand_plan.forecast, \
+                        self.demand_plan.sd_forecast, self.returns_plan.returns, self.POD_orders, \
+                        self.digital_orders, self.orders, self.offshore_orders, self.starting_inventory, self.average_inventory,)
 
         #self.POD_FMC = self.calc_costs()[0]
         #self.calculated_costs = self.calc_costs()
@@ -185,7 +177,7 @@ class Purchase_Plan(object):
         qty = sum(forecast[i:i+n])-sum(returns[i:i+n])#-starting_inventory
 
         def get_umc(umc_type):
-            a, b = self.cost['Printing'][umc_type] # can use a slice if tuple has len >2
+            a, b = self.title.cost['Printing'][umc_type] # can use a slice if tuple has len >2
             return a/qty + b
 
         umcs = map(get_umc, self.technology_types)
@@ -253,7 +245,7 @@ class Purchase_Plan(object):
 
         # Caclulate Fixed Manufacturing Cost (FMC)
 
-        FMCs = [[self.cost['Printing'][tt][0] if round(order) else 0 for order in agg_orders[tt]]
+        FMCs = [[self.title.cost['Printing'][tt][0] if round(order) else 0 for order in agg_orders[tt]]
                     for tt in self.technology_types]
        
         POD_FMC, digital_FMC, conv_FMC, offshore_FMC = FMCs[0], FMCs[1], FMCs[2], FMCs[3]
@@ -262,7 +254,7 @@ class Purchase_Plan(object):
                 
         # Calculate Variable Manufacturing Cost (VMC)
 
-        VMCs = [[self.cost['Printing'][tt][1] * order for order in agg_orders[tt]]
+        VMCs = [[self.title.cost['Printing'][tt][1] * order for order in agg_orders[tt]]
             for tt in self.technology_types]
 
         POD_VMC, digital_VMC, conv_VMC, offshore_VMC = VMCs[0], VMCs[1], VMCs[2], VMCs[3]
@@ -279,12 +271,12 @@ class Purchase_Plan(object):
 
         umc = (sum_FMC + sum_VMC) / sum_orders # approximation - should be a list
 
-        carry_stg_cost = [float(self.cost['WACC']) / 12 * month_avg * umc for month_avg in average_inventory]
+        carry_stg_cost = [float(self.title.cost['WACC']) / 12 * month_avg * umc for month_avg in average_inventory]
 
-        if self.SS_as_POD_flag == False:
-            loss = self.cost['lost_margin']
+        if self.ss_plan.SS_as_POD_flag == False:
+            loss = self.title.cost['lost_margin']
         else:
-            loss = self.cost['Printing']["POD"][1]
+            loss = self.title.cost['Printing']["POD"][1]
 
 
         # the following needs to be updated to feed the correct expected demand over a replenishment lead time 
@@ -489,7 +481,8 @@ def scenario(title, Demand_Plan, Returns_Plan, Print_Plan, Purchase_Plan, SS_Pla
 
     # scenario_costs = map(sum, [pu.FMC, pu.VMC, pu.POD_VMC, pu.carry_stg_cost, pu.lost_sales_expected])
 
-    stats = {'forecast' : sum(d.forecast), 'returns' : sum(r.returns), 'orders': sum(pu.orders), 
+    stats = {'forecast' : sum(d.forecast), 'returns' : sum(r.returns), 'Conventional orders': sum(pu.orders), 
+    'POD orders': sum(pu.POD_orders), 'Digital orders': sum(pu.digital_orders), 'Offshore orders': sum(pu.offshore_orders), 
         'total cost': pu.total_cost, 'scrap': pu.ending_inventory[-1]}
 
     return stats
