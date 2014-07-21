@@ -95,8 +95,9 @@ class Conservative_Demand_Plan(Demand_Plan):
 
 class Returns_Plan(object):
     def __init__(self, title, demand_plan, returns_rate, lag):
-        self.title_name = title.title_name
+        self.title= title
         self.d_plan = demand_plan
+
         self.returns_rate = returns_rate
         self.lag = lag
         self.returns = self.calc_returns_forecast(self.d_plan.forecast, self.returns_rate, self.lag)
@@ -352,8 +353,9 @@ class SS_Plan(object):
     """Base class for safety stock strategies"""
     
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
-        self.title_name = title.title_name
+        self.title = title
         self.d_plan = demand_plan
+
         self.target_service_level = target_service_level
         self.replen_lead_time = replen_lead_time
         self.reorder_point = self.calc_reorder_points(self.d_plan, self.target_service_level, self.replen_lead_time)
@@ -434,14 +436,14 @@ class SS_Plan(object):
 
 class SS_Plan_None(SS_Plan):
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
-        self.demand_plan = demand_plan
-        self.reorder_point = [0] * len(self.demand_plan.forecast)
+        self.d_plan = demand_plan
+        self.reorder_point = [0] * len(self.d_plan.forecast)
         self.SS_as_POD_flag = False
 
 class SS_Plan_POD(SS_Plan):
     def __init__(self, title, demand_plan, target_service_level, replen_lead_time):
-        self.demand_plan = demand_plan
-        self.reorder_point = [0] * len(self.demand_plan.forecast)
+        self.d_plan = demand_plan
+        self.reorder_point = [0] * len(self.d_plan.forecast)
         self.SS_as_POD_flag = True
 
 
